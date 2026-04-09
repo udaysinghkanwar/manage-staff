@@ -1,6 +1,6 @@
 # Phase 5 — WhatsApp Inbound Handling (Webhook + Claude Parser)
 
-## Status: Pending
+## Status: Complete
 
 ## Context
 Phases 1–4 are complete.

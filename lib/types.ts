@@ -32,6 +32,7 @@ export interface Job {
   shift: ShiftType | null
   description: string | null
   safety_shoes_required: boolean
+  required_days: DayOfWeek[] | null
   status: JobStatus
   created_at: string
   updated_at: string

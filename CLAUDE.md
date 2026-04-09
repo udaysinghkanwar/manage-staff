@@ -66,9 +66,12 @@ npx shadcn add <component>
 ```
 Icon library is `lucide-react`. Path alias `@/` maps to the project root.
 
+The `Button` component uses `@base-ui/react` — it has **no `asChild` prop**. To style a `<Link>` as a button, import `buttonVariants` and apply it directly: `<Link className={cn(buttonVariants(), '...')}>`.
+
 ### Build Plan
 
 Phase specs live in `docs/phases/`. Current status:
 - Phase 1 (setup + schema): **complete**
 - Phase 2 (auth flow): **complete**
-- Phases 3–7: pending — implement them in order; each phase doc lists exact files and requirements
+- Phase 3 (workers section): **complete**
+- Phases 4–7: pending — implement them in order; each phase doc lists exact files and requirements

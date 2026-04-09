@@ -7,11 +7,12 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const devBypass = process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === 'true'
 
-  if (!user) {
-    redirect('/login')
+  if (!devBypass) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) redirect('/login')
   }
 
   return (

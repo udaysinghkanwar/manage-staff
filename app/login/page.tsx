@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
+const DEV_BYPASS = process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === 'true'
+
 function LoginForm() {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
@@ -16,6 +19,7 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const hasError = searchParams.get('error')
+  const router = useRouter()
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -108,6 +112,19 @@ function LoginForm() {
           >
             {loading ? 'Sending…' : 'Send login link'}
           </Button>
+
+          {DEV_BYPASS && (
+            <div className="pt-2 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full min-h-[44px] text-xs text-muted-foreground"
+                onClick={() => router.push('/dashboard')}
+              >
+                [DEV] Skip login → Dashboard
+              </Button>
+            </div>
+          )}
         </form>
       </CardContent>
     </Card>

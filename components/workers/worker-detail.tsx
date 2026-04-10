@@ -12,6 +12,8 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import type { DayOfWeek, ShiftType, AvailabilityType, WorkerGender } from '@/lib/types'
 import { DAYS, DAY_LABELS } from '@/lib/constants'
+import { PhoneInput } from '@/components/ui/phone-input'
+import { formatPhone, normalizePhone } from '@/lib/phone'
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })
@@ -52,7 +54,7 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
 
   function handleSave() {
     if (!name.trim()) { setError('Name is required.'); return }
-    if (!phone.trim() || !/^\+?[\d\s\-().]{7,}$/.test(phone.trim())) {
+    if (!phone.trim() || phone.replace(/\D/g, '').length < 10) {
       setError('Enter a valid phone number.'); return
     }
     if (availType === 'part-time' && availDays.length === 0) {
@@ -82,7 +84,7 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{worker.name}</h1>
-          <p className="text-muted-foreground">{worker.phone}</p>
+          <p className="text-muted-foreground">{formatPhone(worker.phone)}</p>
         </div>
         <div className="flex items-center gap-2">
           {worker.status === 'inactive' && (
@@ -128,7 +130,10 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
             </div>
             <div className="space-y-1.5">
               <Label>Phone *</Label>
-              <Input value={phone} onChange={e => setPhone(e.target.value)} className="min-h-[44px]" />
+              <PhoneInput
+                value={normalizePhone(phone)}
+                onChange={(_fmt, raw) => setPhone(raw)}
+              />
             </div>
             <div className="space-y-1.5">
               <Label>Address</Label>

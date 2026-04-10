@@ -18,6 +18,7 @@ import {
   DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { DAY_LABELS, DAYS } from '@/lib/constants'
+import { formatPhone } from '@/lib/phone'
 import { MapPin, ShieldAlert, Users, Radio } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ShiftType, DayOfWeek } from '@/lib/types'
@@ -82,7 +83,7 @@ function JobInfo({ job, onSaved }: { job: JobDetailData['job']; onSaved: () => v
     })
   }
 
-  function handleStatusChange(newStatus: 'filled' | 'cancelled') {
+  function handleStatusChange(newStatus: 'open' | 'filled' | 'cancelled') {
     startTransition(async () => {
       const result = await updateJob(job.id, { status: newStatus })
       if (result?.error) toast.error(result.error)
@@ -196,16 +197,24 @@ function JobInfo({ job, onSaved }: { job: JobDetailData['job']; onSaved: () => v
         </dl>
       )}
 
-      {job.status === 'open' && !editing && (
+      {!editing && (
         <div className="flex gap-2 pt-2 border-t">
-          <Button variant="outline" size="sm" className="min-h-[36px]" disabled={isPending}
-            onClick={() => handleStatusChange('filled')}>
-            Mark as Filled
-          </Button>
-          <Button variant="destructive" size="sm" className="min-h-[36px]" disabled={isPending}
-            onClick={() => handleStatusChange('cancelled')}>
-            Cancel Job
-          </Button>
+          {job.status === 'open' && <>
+            <Button variant="outline" size="sm" className="min-h-[36px]" disabled={isPending}
+              onClick={() => handleStatusChange('filled')}>
+              Mark as Filled
+            </Button>
+            <Button variant="destructive" size="sm" className="min-h-[36px]" disabled={isPending}
+              onClick={() => handleStatusChange('cancelled')}>
+              Cancel Job
+            </Button>
+          </>}
+          {(job.status === 'filled' || job.status === 'cancelled') && (
+            <Button variant="outline" size="sm" className="min-h-[36px]" disabled={isPending}
+              onClick={() => handleStatusChange('open')}>
+              Reopen Job
+            </Button>
+          )}
         </div>
       )}
     </div>
@@ -301,7 +310,7 @@ function MatchedWorkers({
                     </Badge>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-0.5">{w.phone}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{formatPhone(w.phone)}</p>
                 {w.address && <p className="text-xs text-muted-foreground truncate">{w.address}</p>}
                 {w.availability_type === 'part-time' && w.available_days?.length ? (
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -391,7 +400,7 @@ function BroadcastResults({
               <Link href={`/dashboard/workers/${b.worker.id}`} className="font-medium hover:underline">
                 {b.worker.name}
               </Link>
-              <p className="text-xs text-muted-foreground">{b.worker.phone}</p>
+              <p className="text-xs text-muted-foreground">{formatPhone(b.worker.phone)}</p>
               <p className="text-xs text-muted-foreground">
                 Sent {new Date(b.sent_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 {b.responded_at && ` · Replied ${new Date(b.responded_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`}
@@ -482,7 +491,7 @@ function AssignedWorkers({
                   {a.worker.name}
                 </Link>
                 <p className="text-xs text-muted-foreground">
-                  {a.worker.phone} · Assigned {new Date(a.assigned_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
+                  {formatPhone(a.worker.phone)} · Assigned {new Date(a.assigned_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
                 </p>
               </div>
               <Button variant="outline" size="sm"
@@ -514,7 +523,7 @@ function AssignedWorkers({
                     onChange={() => setSelectedWorkerId(w.id)} className="w-4 h-4" />
                   <div>
                     <p className="font-medium text-sm">{w.name}</p>
-                    <p className="text-xs text-muted-foreground">{w.phone} · <span className="capitalize">{w.shift ?? 'no shift'}</span></p>
+                    <p className="text-xs text-muted-foreground">{formatPhone(w.phone)} · <span className="capitalize">{w.shift ?? 'no shift'}</span></p>
                   </div>
                 </label>
               ))}
@@ -557,7 +566,9 @@ export function JobDetail({
       <Separator />
 
       <JobInfo job={data.job} onSaved={() => {}} />
-      <MatchedWorkers workers={data.matched} jobId={data.job.id} onBroadcastSent={refreshBroadcasts} />
+      {data.job.status === 'open' && (
+        <MatchedWorkers workers={data.matched} jobId={data.job.id} onBroadcastSent={refreshBroadcasts} />
+      )}
       <BroadcastResults jobId={data.job.id} initialBroadcasts={broadcasts} onAssign={refreshBroadcasts} />
       <AssignedWorkers jobId={data.job.id} assigned={data.assigned} availableWorkers={availableWorkers} />
     </div>

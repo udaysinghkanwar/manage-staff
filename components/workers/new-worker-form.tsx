@@ -7,8 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { PhoneInput } from '@/components/ui/phone-input'
 import type { DayOfWeek, ShiftType, AvailabilityType, WorkerGender } from '@/lib/types'
 import { DAYS } from '@/lib/constants'
+import { normalizePhone } from '@/lib/phone'
 
 type FormState = { error: string | null; field?: string } | null
 
@@ -50,22 +52,14 @@ type ControlledFields = Record<string, string>
 export function NewWorkerForm() {
   const [state, action, pending] = useActionState(submitWorker, null)
   const [availType, setAvailType] = useState<string>('')
-  const [controlled, setControlled] = useState<ControlledFields>({ phone: '' })
+  const [phoneRaw, setPhoneRaw] = useState('')
 
   useEffect(() => {
-    if (state?.field) {
-      setControlled(prev => ({ ...prev, [state.field!]: '' }))
-    }
+    if (state?.field === 'phone') setPhoneRaw('')
   }, [state])
 
   const fieldError = (name: string) =>
     state?.field === name ? state.error : null
-
-  const controlledProps = (name: string) =>
-    name in controlled
-      ? { value: controlled[name], onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-          setControlled(prev => ({ ...prev, [name]: e.target.value })) }
-      : {}
 
   return (
     <form action={action} className="space-y-5">
@@ -84,11 +78,13 @@ export function NewWorkerForm() {
       {/* Phone */}
       <div className="space-y-1.5">
         <Label htmlFor="phone">Phone <span className="text-destructive">*</span></Label>
-        <Input
-          id="phone" name="phone" type="tel" placeholder="+1 416 555 0100"
-          className={`min-h-[44px] ${fieldError('phone') ? 'border-destructive focus-visible:ring-destructive/50' : ''}`}
-          {...controlledProps('phone')}
-          required
+        {/* Hidden input carries the normalized value to the server action */}
+        <input type="hidden" name="phone" value={normalizePhone(phoneRaw)} />
+        <PhoneInput
+          id="phone"
+          value={phoneRaw}
+          onChange={(_formatted, raw) => setPhoneRaw(raw)}
+          className={fieldError('phone') ? 'ring-2 ring-destructive' : ''}
         />
         {fieldError('phone') && (
           <p className="text-xs text-destructive">{fieldError('phone')}</p>

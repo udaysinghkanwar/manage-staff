@@ -38,9 +38,11 @@ Do not include any explanation. Return only the JSON object.`
 const client = new Anthropic()
 
 export async function parseAvailabilityMessage(
-  _phone: string,
+  phone: string,
   messageBody: string
 ): Promise<ParsedWorkerData> {
+  console.log(`[claude-parser] calling Claude for ${phone} — "${messageBody.slice(0, 80)}${messageBody.length > 80 ? '…' : ''}"`)
+
   try {
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
@@ -59,7 +61,7 @@ export async function parseAvailabilityMessage(
     const json = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
     const parsed = JSON.parse(json)
 
-    return {
+    const result: ParsedWorkerData = {
       name: parsed.name ?? null,
       address: parsed.address ?? null,
       gender: parsed.gender ?? null,
@@ -68,8 +70,11 @@ export async function parseAvailabilityMessage(
       available_days: Array.isArray(parsed.available_days) ? parsed.available_days : null,
       notes: parsed.notes ?? null,
     }
+
+    console.log(`[claude-parser] result for ${phone}:`, JSON.stringify(result))
+    return result
   } catch (err) {
-    console.error('[claude-parser] failed:', err instanceof Error ? err.message : err)
+    console.error('[claude-parser] failed for', phone, '—', err instanceof Error ? err.message : err)
     return EMPTY
   }
 }

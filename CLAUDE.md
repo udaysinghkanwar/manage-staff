@@ -77,4 +77,4 @@ Phase specs live in `docs/phases/`. Current status:
 - Phase 4 (jobs section): **complete**
 - Phase 5 (WhatsApp inbound): **complete**
 - Phase 6 (broadcast system): **complete**
-- Phase 7: pending — implement them in order; each phase doc lists exact files and requirements
+- Phase 7 (polish + inbox): **complete** — implement them in order; each phase doc lists exact files and requirements

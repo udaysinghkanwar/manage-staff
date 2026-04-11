@@ -58,6 +58,7 @@ export async function getWorkers(): Promise<WorkerWithAssignment[]> {
       job_assignments (
         id,
         job_id,
+        assigned_date,
         jobs ( id, title, status )
       )
     `)
@@ -65,9 +66,12 @@ export async function getWorkers(): Promise<WorkerWithAssignment[]> {
 
   if (error) throw new Error(error.message)
 
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+
   return (data ?? []).map((w) => {
     const activeAssignment = w.job_assignments?.find(
-      (a: { jobs: { status: string } | null }) => a.jobs?.status === 'open'
+      (a: { assigned_date: string; jobs: { status: string } | null }) =>
+        a.assigned_date === today && a.jobs?.status !== 'cancelled'
     )
     return {
       ...w,
@@ -180,4 +184,17 @@ export async function deactivateWorker(id: string) {
 
   if (error) return { error: error.message }
   redirect('/dashboard/workers')
+}
+
+export async function reactivateWorker(id: string) {
+  const supabase = await createClient()
+  const { error } = await supabase
+    .from('workers')
+    .update({ status: 'active' })
+    .eq('id', id)
+
+  if (error) return { error: error.message }
+  revalidatePath(`/dashboard/workers/${id}`)
+  revalidatePath('/dashboard/workers')
+  return { error: null }
 }

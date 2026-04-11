@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import type { Job, ShiftType, DayOfWeek } from '@/lib/types'
+import type { Job, ShiftType, DayOfWeek, Company } from '@/lib/types'
 import type { WorkerWithAssignment } from '@/lib/workers'
 
 export interface JobWithCount extends Job {
@@ -17,6 +17,10 @@ export interface CreateJobData {
   description?: string
   safety_shoes_required: boolean
   required_days?: DayOfWeek[]
+  job_date?: string | null
+  required_male?: number
+  required_female?: number
+  company_id?: string | null
 }
 
 export interface UpdateJobData extends Partial<Omit<CreateJobData, 'shift'>> {
@@ -39,6 +43,7 @@ export interface BroadcastRow {
 
 export interface JobDetail {
   job: Job
+  company: Company | null
   matched: MatchedWorker[]
   assigned: Array<{
     assignment_id: string
@@ -78,7 +83,7 @@ export async function getJob(id: string): Promise<JobDetail> {
 
   if (error || !job) throw new Error(error?.message ?? 'Job not found')
 
-  const [{ data: assignedRaw }, matched, broadcasts] = await Promise.all([
+  const [{ data: assignedRaw }, matched, broadcasts, companyRes] = await Promise.all([
     supabase
       .from('job_assignments')
       .select('id, assigned_at, worker_id, workers(id, name, phone)')
@@ -86,6 +91,9 @@ export async function getJob(id: string): Promise<JobDetail> {
       .order('assigned_at', { ascending: false }),
     getMatchedWorkers(id, job),
     getBroadcasts(id),
+    job.company_id
+      ? supabase.from('companies').select('*').eq('id', job.company_id).single()
+      : Promise.resolve({ data: null }),
   ])
 
   const assigned = (assignedRaw ?? []).map((a) => ({
@@ -96,7 +104,7 @@ export async function getJob(id: string): Promise<JobDetail> {
     },
   }))
 
-  return { job, matched, assigned, broadcasts }
+  return { job, company: (companyRes.data as Company | null) ?? null, matched, assigned, broadcasts }
 }
 
 export async function getBroadcasts(jobId: string): Promise<BroadcastRow[]> {
@@ -135,7 +143,7 @@ export async function getMatchedWorkers(
 
   const resolvedJob = job
 
-  // Fetch all active workers with their open job assignments
+  // Fetch all active workers with their today's assignments
   const { data: workers, error } = await supabase
     .from('workers')
     .select(`
@@ -143,7 +151,8 @@ export async function getMatchedWorkers(
       job_assignments (
         id,
         job_id,
-        jobs ( id, status )
+        assigned_date,
+        jobs ( status )
       )
     `)
     .eq('status', 'active')
@@ -151,14 +160,16 @@ export async function getMatchedWorkers(
 
   if (error || !workers) return []
 
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
   const jobLocation = resolvedJob.location.toLowerCase()
 
   const matched: MatchedWorker[] = []
 
   for (const w of workers) {
-    // Rule 2: must not be assigned to another open job
+    // Rule 2: must not be assigned to any non-cancelled job on the same day
     const isAssigned = w.job_assignments?.some(
-      (a: { jobs: { status: string } | null }) => a.jobs?.status === 'open'
+      (a: { assigned_date: string; jobs: { status: string } | null }) =>
+        a.assigned_date === today && a.jobs?.status !== 'cancelled'
     )
 
     // Rule 3: shift must match (workers with no shift set are treated as flexible)
@@ -213,6 +224,10 @@ export async function createJob(data: CreateJobData) {
       description: data.description?.trim() || null,
       safety_shoes_required: data.safety_shoes_required,
       required_days: data.required_days?.length ? data.required_days : null,
+      job_date: data.job_date ?? null,
+      required_male: data.required_male ?? 0,
+      required_female: data.required_female ?? 0,
+      company_id: data.company_id ?? null,
       status: 'open',
     })
     .select('id')
@@ -234,6 +249,10 @@ export async function updateJob(id: string, data: UpdateJobData) {
       ...(data.description !== undefined && { description: data.description?.trim() || null }),
       ...(data.safety_shoes_required !== undefined && { safety_shoes_required: data.safety_shoes_required }),
       ...(data.required_days !== undefined && { required_days: data.required_days?.length ? data.required_days : null }),
+      ...(data.job_date !== undefined && { job_date: data.job_date ?? null }),
+      ...(data.required_male !== undefined && { required_male: data.required_male }),
+      ...(data.required_female !== undefined && { required_female: data.required_female }),
+      ...(data.company_id !== undefined && { company_id: data.company_id }),
       ...(data.status !== undefined && { status: data.status }),
     })
     .eq('id', id)
@@ -247,9 +266,19 @@ export async function updateJob(id: string, data: UpdateJobData) {
 export async function assignWorker(jobId: string, workerId: string) {
   const supabase = await createClient()
 
+  // Use the job's job_date as the assigned_date so availability blocking
+  // is tied to the actual work day. Fall back to today if no date is set.
+  const { data: job } = await supabase
+    .from('jobs')
+    .select('job_date')
+    .eq('id', jobId)
+    .single()
+
+  const assignedDate = job?.job_date ?? new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+
   const { error } = await supabase
     .from('job_assignments')
-    .insert({ job_id: jobId, worker_id: workerId })
+    .insert({ job_id: jobId, worker_id: workerId, assigned_date: assignedDate })
 
   if (error) return { error: error.message }
   revalidatePath(`/dashboard/jobs/${jobId}`)
@@ -276,15 +305,18 @@ export async function getAvailableWorkers() {
 
   const { data, error } = await supabase
     .from('workers')
-    .select('*, job_assignments(id, jobs(status))')
+    .select('*, job_assignments(id, assigned_date, jobs(status))')
     .eq('status', 'active')
     .order('name')
 
   if (error) return []
 
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+
   return (data ?? []).filter((w) =>
     !w.job_assignments?.some(
-      (a: { jobs: { status: string } | null }) => a.jobs?.status === 'open'
+      (a: { assigned_date: string; jobs: { status: string } | null }) =>
+        a.assigned_date === today && a.jobs?.status !== 'cancelled'
     )
   ).map((w) => ({ id: w.id, name: w.name, phone: w.phone, shift: w.shift }))
 }

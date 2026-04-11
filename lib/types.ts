@@ -25,6 +25,18 @@ export interface Worker {
   updated_at: string
 }
 
+export interface Company {
+  id: string
+  name: string
+  street_address: string
+  city: string
+  province: string   // ISO code, e.g. 'ON'
+  country: string    // ISO code, e.g. 'CA'
+  postal_code: string
+  created_at: string
+  updated_at: string
+}
+
 export interface Job {
   id: string
   title: string
@@ -33,7 +45,11 @@ export interface Job {
   description: string | null
   safety_shoes_required: boolean
   required_days: DayOfWeek[] | null
+  job_date: string | null
+  required_male: number
+  required_female: number
   status: JobStatus
+  company_id: string | null
   created_at: string
   updated_at: string
 }

@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { PhoneInput } from '@/components/ui/phone-input'
+import { CityPicker } from '@/components/ui/city-picker'
 import type { DayOfWeek, ShiftType, AvailabilityType, WorkerGender } from '@/lib/types'
 import { DAYS } from '@/lib/constants'
 import { normalizePhone } from '@/lib/phone'
@@ -53,6 +54,7 @@ export function NewWorkerForm() {
   const [state, action, pending] = useActionState(submitWorker, null)
   const [availType, setAvailType] = useState<string>('')
   const [phoneRaw, setPhoneRaw] = useState('')
+  const [city, setCity] = useState('')
 
   useEffect(() => {
     if (state?.field === 'phone') setPhoneRaw('')
@@ -91,10 +93,11 @@ export function NewWorkerForm() {
         )}
       </div>
 
-      {/* Address */}
+      {/* City */}
       <div className="space-y-1.5">
-        <Label htmlFor="address">Address</Label>
-        <Textarea id="address" name="address" placeholder="123 Main St, Brampton, ON" rows={2} />
+        <Label htmlFor="address">City</Label>
+        <input type="hidden" name="address" value={city} />
+        <CityPicker id="address" value={city} onChange={setCity} />
       </div>
 
       {/* Gender */}

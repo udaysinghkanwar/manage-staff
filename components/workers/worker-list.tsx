@@ -3,12 +3,9 @@
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Badge } from '@/components/ui/badge'
-import {
-  Select, SelectContent, SelectItem,
-  SelectTrigger, SelectValue,
-} from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { Users, Search, UserPlus, Phone, Calendar } from 'lucide-react'
+import { FilterDropdown } from '@/components/ui/filter-dropdown'
+import { Users, Search, UserPlus, Phone, Calendar, X } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { DAY_LABELS } from '@/lib/constants'
@@ -27,6 +24,13 @@ export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
   const [avail, setAvail]     = useState<AvailFilter>('all')
   const [assign, setAssign]   = useState<AssignFilter>('all')
   const [location, setLocation] = useState('all')
+
+  const isFiltered = search || gender !== 'all' || shift !== 'all' || avail !== 'all' || assign !== 'all' || location !== 'all'
+
+  function resetFilters() {
+    setSearch(''); setGender('all'); setShift('all')
+    setAvail('all'); setAssign('all'); setLocation('all')
+  }
 
   // Extract unique locations from addresses
   const locations = useMemo(() => {
@@ -83,64 +87,67 @@ export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
       </div>
 
       {/* Filter strip */}
-      <div className="flex items-end gap-4 px-6 py-3 border-b border-border flex-wrap">
+      <div className="flex items-end gap-4 px-6 py-4 border-b border-border flex-wrap min-h-[72px]">
         <span className="text-xs font-medium text-muted-foreground mb-1 shrink-0">Filters</span>
-        <LabeledFilter label="Gender">
-          <FilterSelect
-            value={gender} onValueChange={(v) => setGender((v ?? 'all') as GenderFilter)}
-            options={[
-              { value: 'all', label: 'All' },
-              { value: 'male', label: 'Male' },
-              { value: 'female', label: 'Female' },
-            ]}
-          />
-        </LabeledFilter>
-        <LabeledFilter label="Shift">
-          <FilterSelect
-            value={shift} onValueChange={(v) => setShift((v ?? 'all') as ShiftFilter)}
-            options={[
-              { value: 'all', label: 'All' },
-              { value: 'day', label: 'Day' },
-              { value: 'afternoon', label: 'Afternoon' },
-              { value: 'night', label: 'Night' },
-            ]}
-          />
-        </LabeledFilter>
-        <LabeledFilter label="Availability">
-          <FilterSelect
-            value={avail} onValueChange={(v) => setAvail((v ?? 'all') as AvailFilter)}
-            options={[
-              { value: 'all', label: 'All' },
-              { value: 'full-time', label: 'Full-time' },
-              { value: 'part-time', label: 'Part-time' },
-            ]}
-          />
-        </LabeledFilter>
-        <LabeledFilter label="Status">
-          <FilterSelect
-            value={assign} onValueChange={(v) => setAssign((v ?? 'all') as AssignFilter)}
-            options={[
-              { value: 'all', label: 'All' },
-              { value: 'available', label: 'Available' },
-              { value: 'assigned', label: 'Assigned' },
-            ]}
-          />
-        </LabeledFilter>
+        <FilterDropdown label="Gender" value={gender}
+          onValueChange={(v) => setGender(v as GenderFilter)}
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'male', label: 'Male' },
+            { value: 'female', label: 'Female' },
+          ]}
+        />
+        <FilterDropdown label="Shift" value={shift}
+          onValueChange={(v) => setShift(v as ShiftFilter)}
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'day', label: 'Day' },
+            { value: 'afternoon', label: 'Afternoon' },
+            { value: 'night', label: 'Night' },
+          ]}
+        />
+        <FilterDropdown label="Availability" value={avail}
+          onValueChange={(v) => setAvail(v as AvailFilter)}
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'full-time', label: 'Full-time' },
+            { value: 'part-time', label: 'Part-time' },
+          ]}
+        />
+        <FilterDropdown label="Status" value={assign}
+          onValueChange={(v) => setAssign(v as AssignFilter)}
+          options={[
+            { value: 'all', label: 'All' },
+            { value: 'available', label: 'Available' },
+            { value: 'assigned', label: 'Assigned' },
+          ]}
+        />
         {locations.length > 0 && (
-          <LabeledFilter label="Location">
-            <FilterSelect
-              value={location} onValueChange={(v) => setLocation(v ?? 'all')}
-              options={[
-                { value: 'all', label: 'All' },
-                ...locations.map((l) => ({ value: l, label: l })),
-              ]}
-            />
-          </LabeledFilter>
+          <FilterDropdown label="Location" value={location}
+            onValueChange={setLocation}
+            options={[
+              { value: 'all', label: 'All' },
+              ...locations.map((l) => ({ value: l, label: l })),
+            ]}
+          />
+        )}
+
+        {isFiltered && (
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-transparent select-none">·</span>
+            <button
+              onClick={resetFilters}
+              className="flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent hover:border-border transition-colors"
+            >
+              <X className="h-3 w-3" />
+              Reset
+            </button>
+          </div>
         )}
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+      <div className="flex-1 overflow-y-auto px-6 py-6">
         {workers.length === 0 ? (
           <Empty
             icon={<Users className="h-8 w-8" />}
@@ -225,37 +232,6 @@ function CoffeeChip({ children }: { children: React.ReactNode }) {
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 
-function LabeledFilter({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs text-zinc-500">{label}</span>
-      {children}
-    </div>
-  )
-}
-
-function FilterSelect({
-  value, onValueChange, options,
-}: {
-  value: string
-  onValueChange: (v: string | null) => void
-  options: { value: string; label: string }[]
-}) {
-  return (
-    <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger size="sm" className="h-7 text-xs min-w-[100px]">
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        {options.map((o) => (
-          <SelectItem key={o.value} value={o.value}>
-            {o.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  )
-}
 
 function Empty({
   icon, title, description,

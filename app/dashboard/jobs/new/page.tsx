@@ -2,9 +2,11 @@ import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button'
 import { ChevronLeft } from 'lucide-react'
 import { NewJobForm } from '@/components/jobs/new-job-form'
+import { getCompanies } from '@/lib/companies'
 import { cn } from '@/lib/utils'
 
-export default function NewJobPage() {
+export default async function NewJobPage() {
+  const companies = await getCompanies()
   return (
     <div className="p-4 md:p-6 max-w-xl mx-auto">
       <Link
@@ -15,7 +17,7 @@ export default function NewJobPage() {
         Jobs
       </Link>
       <h1 className="text-2xl font-semibold mb-6">Create Job</h1>
-      <NewJobForm />
+      <NewJobForm companies={companies} />
     </div>
   )
 }

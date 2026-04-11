@@ -6,8 +6,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { DatePicker } from '@/components/ui/date-picker'
+import { Counter } from '@/components/ui/counter'
+import { CompanyPicker } from '@/components/ui/company-picker'
+import { formatCompanyLocation } from '@/lib/company-utils'
 import { DAYS } from '@/lib/constants'
-import type { ShiftType, DayOfWeek } from '@/lib/types'
+import type { ShiftType, DayOfWeek, Company } from '@/lib/types'
 
 type FormState = { error: string | null } | null
 
@@ -18,8 +22,13 @@ async function submit(_prev: FormState, formData: FormData): Promise<FormState> 
   const description = formData.get('description') as string
   const safety_shoes_required = formData.get('safety_shoes_required') === 'true'
   const required_days = formData.getAll('required_days') as DayOfWeek[]
+  const job_date = (formData.get('job_date') as string) || null
+  const required_male = parseInt(formData.get('required_male') as string) || 0
+  const required_female = parseInt(formData.get('required_female') as string) || 0
+  const company_id = (formData.get('company_id') as string) || null
 
   if (!title) return { error: 'Job title is required.' }
+  if (!company_id) return { error: 'Company is required.' }
   if (!location) return { error: 'Location is required.' }
   if (!shift) return { error: 'Shift is required.' }
 
@@ -27,14 +36,31 @@ async function submit(_prev: FormState, formData: FormData): Promise<FormState> 
     title, location, shift, description,
     safety_shoes_required,
     required_days: required_days.length ? required_days : undefined,
+    job_date, required_male, required_female,
+    company_id,
   })
 
   return result ?? null
 }
 
-export function NewJobForm() {
+export function NewJobForm({ companies: initialCompanies }: { companies: Company[] }) {
   const [state, action, pending] = useActionState(submit, null)
   const [safetyShoes, setSafetyShoes] = useState(false)
+  const [jobDate, setJobDate] = useState<string | null>(null)
+  const [requiredMale, setRequiredMale] = useState(0)
+  const [requiredFemale, setRequiredFemale] = useState(0)
+  const [companies, setCompanies] = useState<Company[]>(initialCompanies)
+  const [company, setCompany] = useState<Company | null>(null)
+  const [location, setLocation] = useState('')
+
+  function handleCompanyChange(next: Company | null) {
+    setCompany(next)
+    if (next) setLocation(formatCompanyLocation(next))
+  }
+
+  function handleCompanyCreated(next: Company) {
+    setCompanies((prev) => [...prev, next].sort((a, b) => a.name.localeCompare(b.name)))
+  }
 
   return (
     <form action={action} className="space-y-5">
@@ -50,8 +76,33 @@ export function NewJobForm() {
       </div>
 
       <div className="space-y-1.5">
+        <Label htmlFor="company">Company <span className="text-destructive">*</span></Label>
+        <input type="hidden" name="company_id" value={company?.id ?? ''} />
+        <CompanyPicker
+          id="company"
+          companies={companies}
+          value={company}
+          onChange={handleCompanyChange}
+          onCompanyCreated={handleCompanyCreated}
+        />
+      </div>
+
+      <div className="space-y-1.5">
         <Label htmlFor="location">Location <span className="text-destructive">*</span></Label>
-        <Input id="location" name="location" placeholder="Brampton, ON" className="min-h-[44px]" />
+        <Input
+          id="location"
+          name="location"
+          placeholder="Brampton, ON"
+          className="min-h-[44px]"
+          value={location}
+          onChange={(e) => setLocation(e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label>Job date <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
+        <input type="hidden" name="job_date" value={jobDate ?? ''} />
+        <DatePicker value={jobDate} onChange={setJobDate} placeholder="Select a date" />
       </div>
 
       <fieldset className="space-y-1.5">
@@ -87,15 +138,25 @@ export function NewJobForm() {
       </div>
 
       <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
-        <input
-          type="checkbox"
-          className="w-4 h-4"
-          checked={safetyShoes}
-          onChange={(e) => setSafetyShoes(e.target.checked)}
-        />
+        <input type="checkbox" className="w-4 h-4" checked={safetyShoes}
+          onChange={(e) => setSafetyShoes(e.target.checked)} />
         <input type="hidden" name="safety_shoes_required" value={String(safetyShoes)} />
         <span className="text-sm font-medium">Safety shoes required</span>
       </label>
+
+      <div className="space-y-3">
+        <p className="text-sm font-medium">Workers needed</p>
+        <input type="hidden" name="required_male" value={requiredMale} />
+        <input type="hidden" name="required_female" value={requiredFemale} />
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Male</span>
+          <Counter value={requiredMale} onChange={setRequiredMale} />
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-muted-foreground">Female</span>
+          <Counter value={requiredFemale} onChange={setRequiredFemale} />
+        </div>
+      </div>
 
       <Button type="submit" className="w-full min-h-[44px]" disabled={pending}>
         {pending ? 'Creating…' : 'Create Job'}

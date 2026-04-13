@@ -24,7 +24,7 @@ export async function broadcastJob(
   // Fetch job
   const { data: job } = await supabase
     .from('jobs')
-    .select('title, location, shift, safety_shoes_required, description')
+    .select('title, location, shift, safety_shoes_required, description, job_date, companies(name, street_address, city, province)')
     .eq('id', jobId)
     .single()
 
@@ -46,6 +46,19 @@ export async function broadcastJob(
 
   const result: BroadcastResult = { sent: 0, failed: [] }
 
+  type JobCompany = { name: string; street_address: string; city: string; province: string } | null
+  const company = job.companies as JobCompany
+
+  const jobDate = job.job_date
+    ? new Date(job.job_date + 'T00:00:00').toLocaleDateString('en-CA', {
+        weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+      })
+    : 'TBD'
+  const companyName = company?.name ?? job.location
+  const companyAddress = company
+    ? [company.street_address, company.city, company.province].filter(Boolean).join(', ')
+    : job.location
+
   for (const worker of workers) {
     try {
       const res = await fetch(`${baseUrl}/api/whatsapp/send`, {
@@ -58,7 +71,9 @@ export async function broadcastJob(
           templateParams: [
             worker.name,
             job.title,
-            job.location,
+            jobDate,
+            companyName,
+            companyAddress,
             job.shift ?? 'TBD',
             job.safety_shoes_required ? 'Yes' : 'No',
             job.description ?? 'N/A',

@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       type: 'template',
       template: {
         name: templateName,
-        language: { code: 'en' },
+        language: { code: 'en_US' },
         components: [
           {
             type: 'body',

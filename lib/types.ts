@@ -4,6 +4,7 @@ export type ShiftType = 'day' | 'afternoon' | 'night'
 export type AvailabilityType = 'full-time' | 'part-time'
 export type DayOfWeek = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
 
+export type JobType = 'on-call' | 'full-time'
 export type JobStatus = 'open' | 'filled' | 'cancelled'
 
 export type BroadcastResponse = 'pending' | 'yes' | 'no'
@@ -41,10 +42,10 @@ export interface Job {
   id: string
   title: string
   location: string
+  job_type: JobType
   shift: ShiftType | null
   description: string | null
   safety_shoes_required: boolean
-  required_days: DayOfWeek[] | null
   job_date: string | null
   required_male: number
   required_female: number

@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useTransition, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { getConversations, sendReply } from '@/lib/inbox'
-import type { Conversation } from '@/lib/inbox'
+import type { Conversation, Message } from '@/lib/inbox'
 import { Button } from '@/components/ui/button'
 import { MessageSquare, ChevronLeft, Send } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -51,8 +51,8 @@ function ConversationItem({
 }
 
 function MessageThread({
-  conv, onBack,
-}: { conv: Conversation; onBack: () => void }) {
+  conv, onBack, onOptimisticSend,
+}: { conv: Conversation; onBack: () => void; onOptimisticSend: (text: string) => void }) {
   const [replyText, setReplyText] = useState('')
   const [isPending, startTransition] = useTransition()
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -65,6 +65,7 @@ function MessageThread({
     const text = replyText.trim()
     if (!text) return
     setReplyText('')
+    onOptimisticSend(text)
     startTransition(async () => {
       const result = await sendReply(conv.phone, text)
       if (result.error) toast.error(result.error)
@@ -165,17 +166,78 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
     setConversations(fresh)
   }, [])
 
-  // Realtime — refresh on any new message
+  function handleOptimisticSend(text: string) {
+    if (!selected) return
+    setConversations((prev) => prev.map((c) => {
+      if (c.phone !== selected) return c
+      const optimistic = {
+        id: `optimistic-${Date.now()}`,
+        direction: 'outbound' as const,
+        body: text,
+        created_at: new Date().toISOString(),
+        is_availability_message: false,
+      }
+      return { ...c, messages: [...c.messages, optimistic], last_message: text, last_at: optimistic.created_at }
+    }))
+  }
+
+  // Realtime — listen to postgres_changes on messages table
   useEffect(() => {
     const supabase = createClient()
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
     const channel = supabase
       .channel('inbox-messages')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'messages',
-      }, () => refetch())
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          const row = payload.new as {
+            id: string
+            phone: string
+            worker_id: string | null
+            direction: 'inbound' | 'outbound'
+            body: string | null
+            is_availability_message: boolean
+            created_at: string
+          }
+
+          setConversations((prev) => {
+            const existing = prev.find((c) => c.phone === row.phone)
+
+            const newMsg: Message = {
+              id: row.id,
+              phone: row.phone,
+              worker_id: row.worker_id,
+              direction: row.direction,
+              body: row.body,
+              is_availability_message: row.is_availability_message,
+              created_at: row.created_at,
+            }
+
+            if (existing) {
+              const filtered = existing.messages.filter(
+                (m) => !(m.id.startsWith('optimistic-') && m.body === row.body && m.direction === row.direction)
+              )
+              const updated: Conversation = {
+                ...existing,
+                messages: [...filtered, newMsg],
+                last_message: row.body,
+                last_at: row.created_at,
+                unread: existing.unread || (row.direction === 'inbound' && row.created_at > cutoff),
+              }
+              const rest = prev.filter((c) => c.phone !== row.phone)
+              return [updated, ...rest]
+            }
+
+            // New phone number — fall back to refetch to get worker name
+            refetch()
+            return prev
+          })
+        }
+      )
       .subscribe()
+
     return () => { supabase.removeChannel(channel) }
   }, [refetch])
 
@@ -218,7 +280,7 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
         selected ? 'flex' : 'hidden md:flex'
       )}>
         {selectedConv ? (
-          <MessageThread conv={selectedConv} onBack={() => setSelected(null)} />
+          <MessageThread conv={selectedConv} onBack={() => setSelected(null)} onOptimisticSend={handleOptimisticSend} />
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
             Select a conversation

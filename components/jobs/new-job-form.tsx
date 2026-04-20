@@ -10,19 +10,18 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { Counter } from '@/components/ui/counter'
 import { CompanyPicker } from '@/components/ui/company-picker'
 import { formatCompanyLocation } from '@/lib/company-utils'
-import { DAYS } from '@/lib/constants'
-import type { ShiftType, DayOfWeek, Company } from '@/lib/types'
+import type { ShiftType, JobType, Company } from '@/lib/types'
 
 type FormState = { error: string | null } | null
 
 async function submit(_prev: FormState, formData: FormData): Promise<FormState> {
   const title = (formData.get('title') as string)?.trim()
   const location = (formData.get('location') as string)?.trim()
+  const job_type = (formData.get('job_type') as JobType) || 'on-call'
   const shift = formData.get('shift') as ShiftType | null
   const description = formData.get('description') as string
   const safety_shoes_required = formData.get('safety_shoes_required') === 'true'
-  const required_days = formData.getAll('required_days') as DayOfWeek[]
-  const job_date = (formData.get('job_date') as string) || null
+  const job_date = job_type === 'on-call' ? ((formData.get('job_date') as string) || null) : null
   const required_male = parseInt(formData.get('required_male') as string) || 0
   const required_female = parseInt(formData.get('required_female') as string) || 0
   const company_id = (formData.get('company_id') as string) || null
@@ -33,9 +32,8 @@ async function submit(_prev: FormState, formData: FormData): Promise<FormState> 
   if (!shift) return { error: 'Shift is required.' }
 
   const result = await createJob({
-    title, location, shift, description,
+    title, location, job_type, shift: shift!, description,
     safety_shoes_required,
-    required_days: required_days.length ? required_days : undefined,
     job_date, required_male, required_female,
     company_id,
   })
@@ -45,6 +43,7 @@ async function submit(_prev: FormState, formData: FormData): Promise<FormState> 
 
 export function NewJobForm({ companies: initialCompanies }: { companies: Company[] }) {
   const [state, action, pending] = useActionState(submit, null)
+  const [jobType, setJobType] = useState<JobType>('on-call')
   const [safetyShoes, setSafetyShoes] = useState(false)
   const [jobDate, setJobDate] = useState<string | null>(null)
   const [requiredMale, setRequiredMale] = useState(0)
@@ -99,11 +98,27 @@ export function NewJobForm({ companies: initialCompanies }: { companies: Company
         />
       </div>
 
-      <div className="space-y-1.5">
-        <Label>Job date <span className="text-muted-foreground text-xs font-normal">(optional)</span></Label>
-        <input type="hidden" name="job_date" value={jobDate ?? ''} />
-        <DatePicker value={jobDate} onChange={setJobDate} placeholder="Select a date" />
-      </div>
+      <fieldset className="space-y-1.5">
+        <legend className="text-sm font-medium">Job type <span className="text-destructive">*</span></legend>
+        <input type="hidden" name="job_type" value={jobType} />
+        <div className="flex gap-4">
+          {(['on-call', 'full-time'] as JobType[]).map((t) => (
+            <label key={t} className="flex items-center gap-2 cursor-pointer min-h-[44px]">
+              <input type="radio" name="_job_type" value={t} className="w-4 h-4"
+                checked={jobType === t} onChange={() => setJobType(t)} />
+              <span className="capitalize">{t}</span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      {jobType === 'on-call' && (
+        <div className="space-y-1.5">
+          <Label>Job date</Label>
+          <input type="hidden" name="job_date" value={jobDate ?? ''} />
+          <DatePicker value={jobDate} onChange={setJobDate} placeholder="Select a date" />
+        </div>
+      )}
 
       <fieldset className="space-y-1.5">
         <legend className="text-sm font-medium">Shift <span className="text-destructive">*</span></legend>
@@ -112,21 +127,6 @@ export function NewJobForm({ companies: initialCompanies }: { companies: Company
             <label key={s} className="flex items-center gap-2 cursor-pointer min-h-[44px]">
               <input type="radio" name="shift" value={s} className="w-4 h-4" required />
               <span className="capitalize">{s}</span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-
-      <fieldset className="space-y-1.5">
-        <legend className="text-sm font-medium">Required days <span className="text-muted-foreground text-xs font-normal">(optional — used to match part-time workers)</span></legend>
-        <div className="flex flex-wrap gap-2">
-          {DAYS.map(({ value, label }) => (
-            <label
-              key={value}
-              className="flex items-center gap-1.5 cursor-pointer border rounded-md px-3 py-2 min-h-[44px] has-[:checked]:bg-primary has-[:checked]:text-primary-foreground has-[:checked]:border-primary transition-colors"
-            >
-              <input type="checkbox" name="required_days" value={value} className="sr-only" />
-              <span className="text-sm font-medium">{label}</span>
             </label>
           ))}
         </div>

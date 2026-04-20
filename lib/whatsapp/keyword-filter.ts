@@ -9,9 +9,11 @@ const CATEGORIES = [
   // Days of week
   /\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun|weekday|weekend)\b/i,
   // Shift type
-  /\b(day shift|night shift|afternoon|morning)\b/i,
+  /\b(day shift|night shift|day|night|afternoon|morning)\b/i,
   // Time commitment
   /\b(full.?time|part.?time)\b/i,
+  // Gender
+  /\b(male|female)\b/i,
   // Self-intro patterns
   /\b(my name is|i am|i can work|i'm available|im available)\b/i,
 ]

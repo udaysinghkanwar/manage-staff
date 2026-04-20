@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
-import type { Job, ShiftType, DayOfWeek, Company } from '@/lib/types'
+import type { Job, JobType, ShiftType, DayOfWeek, Company } from '@/lib/types'
 import type { WorkerWithAssignment } from '@/lib/workers'
 
 export interface JobWithCount extends Job {
@@ -13,23 +13,25 @@ export interface JobWithCount extends Job {
 export interface CreateJobData {
   title: string
   location: string
+  job_type: JobType
   shift: ShiftType
   description?: string
   safety_shoes_required: boolean
-  required_days?: DayOfWeek[]
   job_date?: string | null
   required_male?: number
   required_female?: number
   company_id?: string | null
 }
 
-export interface UpdateJobData extends Partial<Omit<CreateJobData, 'shift'>> {
+export interface UpdateJobData extends Partial<Omit<CreateJobData, 'shift' | 'job_type'>> {
+  job_type?: JobType
   shift?: ShiftType
   status?: 'open' | 'filled' | 'cancelled'
 }
 
 export interface MatchedWorker extends WorkerWithAssignment {
   location_match: boolean
+  tier: 1 | 2 | 3 | 4
 }
 
 export interface BroadcastRow {
@@ -143,7 +145,30 @@ export async function getMatchedWorkers(
 
   const resolvedJob = job
 
-  // Fetch all active workers with their today's assignments
+  // Fetch company for city matching
+  let companyCity = ''
+  if (resolvedJob.company_id) {
+    const { data: company } = await supabase
+      .from('companies')
+      .select('city')
+      .eq('id', resolvedJob.company_id)
+      .single()
+    companyCity = company?.city?.toLowerCase() ?? ''
+  }
+
+  // Determine the job's day of week from job_date
+  const DAY_MAP: DayOfWeek[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+  let jobDayOfWeek: DayOfWeek | null = null
+  if (resolvedJob.job_date) {
+    const d = new Date(resolvedJob.job_date + 'T00:00:00')
+    jobDayOfWeek = DAY_MAP[d.getDay()]
+  }
+
+  // The date to check for assignment conflicts — use job_date if set, otherwise today
+  const assignCheckDate = resolvedJob.job_date
+    ?? new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+
+  // Fetch all active workers with their assignments
   const { data: workers, error } = await supabase
     .from('workers')
     .select(`
@@ -160,50 +185,55 @@ export async function getMatchedWorkers(
 
   if (error || !workers) return []
 
-  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
-  const jobLocation = resolvedJob.location.toLowerCase()
-
   const matched: MatchedWorker[] = []
 
   for (const w of workers) {
-    // Rule 2: must not be assigned to any non-cancelled job on the same day
+    // Filter: gender must match (if job requires male/female)
+    if (resolvedJob.required_male > 0 && resolvedJob.required_female === 0 && w.gender !== 'male') continue
+    if (resolvedJob.required_female > 0 && resolvedJob.required_male === 0 && w.gender !== 'female') continue
+
+    // Filter: must not be permanently assigned (full-time) or assigned on the job's date
     const isAssigned = w.job_assignments?.some(
-      (a: { assigned_date: string; jobs: { status: string } | null }) =>
-        a.assigned_date === today && a.jobs?.status !== 'cancelled'
+      (a: { assigned_date: string | null; jobs: { status: string } | null }) =>
+        a.jobs?.status !== 'cancelled' && (a.assigned_date === null || a.assigned_date === assignCheckDate)
     )
+    if (isAssigned) continue
 
-    // Rule 3: shift must match (workers with no shift set are treated as flexible)
-    if (resolvedJob.shift && w.shift && w.shift !== resolvedJob.shift) continue
+    // Matching criteria
+    const shiftMatch = !resolvedJob.shift || !w.shift || w.shift === resolvedJob.shift
+    const cityMatch = !!companyCity && !!w.address && w.address.toLowerCase().includes(companyCity)
+    const daysMatch = w.availability_type === 'full-time' ||
+      !jobDayOfWeek ||
+      !w.available_days?.length ||
+      w.available_days.includes(jobDayOfWeek)
+    const isFullTime = w.availability_type === 'full-time'
 
-    // Rule 4: if job has required_days and worker is part-time,
-    // worker's available_days must overlap with job's required_days
-    if (
-      resolvedJob.required_days?.length &&
-      w.availability_type === 'part-time' &&
-      w.available_days?.length
-    ) {
-      const hasOverlap = resolvedJob.required_days.some((d: DayOfWeek) =>
-        w.available_days!.includes(d)
-      )
-      if (!hasOverlap) continue
+    // Tier ranking
+    let tier: 1 | 2 | 3 | 4
+    if (shiftMatch && cityMatch && daysMatch && isFullTime) {
+      tier = 1
+    } else if (shiftMatch && daysMatch && isFullTime) {
+      tier = 2
+    } else if (shiftMatch) {
+      tier = 3
+    } else {
+      tier = 4
     }
-
-    const locationMatch = !!w.address &&
-      w.address.toLowerCase().includes(jobLocation)
 
     matched.push({
       ...w,
       job_assignments: undefined,
-      is_assigned: !!isAssigned,
+      is_assigned: false,
       assigned_job_id: null,
       assigned_job_title: null,
-      location_match: locationMatch,
+      location_match: cityMatch,
+      tier,
     })
   }
 
-  // Sort: location match first, then by name
+  // Sort by tier first, then by name
   matched.sort((a, b) => {
-    if (a.location_match !== b.location_match) return a.location_match ? -1 : 1
+    if (a.tier !== b.tier) return a.tier - b.tier
     return a.name.localeCompare(b.name)
   })
 
@@ -220,11 +250,11 @@ export async function createJob(data: CreateJobData) {
     .insert({
       title: data.title.trim(),
       location: data.location.trim(),
+      job_type: data.job_type,
       shift: data.shift,
       description: data.description?.trim() || null,
       safety_shoes_required: data.safety_shoes_required,
-      required_days: data.required_days?.length ? data.required_days : null,
-      job_date: data.job_date ?? null,
+      job_date: data.job_type === 'on-call' ? (data.job_date ?? null) : null,
       required_male: data.required_male ?? 0,
       required_female: data.required_female ?? 0,
       company_id: data.company_id ?? null,
@@ -248,7 +278,7 @@ export async function updateJob(id: string, data: UpdateJobData) {
       ...(data.shift !== undefined && { shift: data.shift }),
       ...(data.description !== undefined && { description: data.description?.trim() || null }),
       ...(data.safety_shoes_required !== undefined && { safety_shoes_required: data.safety_shoes_required }),
-      ...(data.required_days !== undefined && { required_days: data.required_days?.length ? data.required_days : null }),
+      ...(data.job_type !== undefined && { job_type: data.job_type }),
       ...(data.job_date !== undefined && { job_date: data.job_date ?? null }),
       ...(data.required_male !== undefined && { required_male: data.required_male }),
       ...(data.required_female !== undefined && { required_female: data.required_female }),
@@ -266,15 +296,17 @@ export async function updateJob(id: string, data: UpdateJobData) {
 export async function assignWorker(jobId: string, workerId: string) {
   const supabase = await createClient()
 
-  // Use the job's job_date as the assigned_date so availability blocking
-  // is tied to the actual work day. Fall back to today if no date is set.
+  // Full-time jobs → null assigned_date (permanent assignment)
+  // On-call jobs → use job_date or today
   const { data: job } = await supabase
     .from('jobs')
-    .select('job_date')
+    .select('job_type, job_date')
     .eq('id', jobId)
     .single()
 
-  const assignedDate = job?.job_date ?? new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
+  const assignedDate = job?.job_type === 'full-time'
+    ? null
+    : (job?.job_date ?? new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' }))
 
   const { error } = await supabase
     .from('job_assignments')

@@ -70,8 +70,8 @@ export async function getWorkers(): Promise<WorkerWithAssignment[]> {
 
   return (data ?? []).map((w) => {
     const activeAssignment = w.job_assignments?.find(
-      (a: { assigned_date: string; jobs: { status: string } | null }) =>
-        a.assigned_date === today && a.jobs?.status !== 'cancelled'
+      (a: { assigned_date: string | null; jobs: { status: string } | null }) =>
+        a.jobs?.status !== 'cancelled' && (a.assigned_date === null || a.assigned_date === today)
     )
     return {
       ...w,

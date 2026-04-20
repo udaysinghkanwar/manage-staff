@@ -95,24 +95,87 @@ export async function POST(request: NextRequest) {
 // ─── Processing pipeline ─────────────────────────────────────────────────────
 
 async function processMessage(phone: string, body: string) {
+  const supabase = getServiceClient()
   const normalized = body.trim().toLowerCase()
 
-  // YES/NO detection — check before keyword filter
+  // YES/NO detection — check before anything else
   if (YES_WORDS.has(normalized) || NO_WORDS.has(normalized)) {
     await handleJobResponse(phone, normalized, body)
     return
   }
 
-  // Availability message pipeline
+  // Check if this is a known worker
+  const { data: worker } = await supabase
+    .from('workers')
+    .select('id')
+    .eq('phone', phone)
+    .maybeSingle()
+
+  if (!worker) {
+    const isAvailability = isAvailabilityMessage(body)
+    if (isAvailability) {
+      // They sent their details directly — register and confirm, skip onboarding
+      const parsed = await parseAvailabilityMessage(phone, body)
+      const workerId = await upsertWorker(phone, parsed)
+      await sendConfirmation(phone)
+      await logMessage(phone, body, 'inbound', true, workerId ?? undefined)
+    } else {
+      // Unknown number, no details yet — send onboarding
+      await sendOnboarding(phone)
+      await logMessage(phone, body, 'inbound', false)
+    }
+    return
+  }
+
+  // Known worker — existing availability pipeline
   const isAvailability = isAvailabilityMessage(body)
   let workerId: string | null = null
 
   if (isAvailability) {
     const parsed = await parseAvailabilityMessage(phone, body)
     workerId = await upsertWorker(phone, parsed)
+    await sendConfirmation(phone)
   }
 
   await logMessage(phone, body, 'inbound', isAvailability, workerId ?? undefined)
+}
+
+function getBaseUrl() {
+  return process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : 'http://localhost:3000'
+}
+
+async function sendOnboarding(phone: string) {
+  try {
+    await fetch(`${getBaseUrl()}/api/whatsapp/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: phone,
+        type: 'text',
+        text: 'Hi! Thanks for reaching out.\n\nTo register as a worker, please reply with your details:\n\nName: [full name]\nLocation: [city, province]\nShift: [day / afternoon / night]\nAvailability: [full-time / part-time]\nDays: [Mon Tue Wed...] (if part-time)\nGender: [male / female]\n\nExample:\nName: John Smith\nLocation: Toronto, ON\nShift: Day\nAvailability: Full-time\nGender: Male',
+      }),
+    })
+  } catch (err) {
+    console.error('[onboarding] failed to send to', phone, err)
+  }
+}
+
+async function sendConfirmation(phone: string) {
+  try {
+    await fetch(`${getBaseUrl()}/api/whatsapp/send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        to: phone,
+        type: 'text',
+        text: 'Your information has been received and processed. To make changes, simply resend your updated details.',
+      }),
+    })
+  } catch (err) {
+    console.error('[confirmation] failed to send to', phone, err)
+  }
 }
 
 async function handleJobResponse(phone: string, normalized: string, raw: string) {

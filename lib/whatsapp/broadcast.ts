@@ -24,7 +24,7 @@ export async function broadcastJob(
   // Fetch job
   const { data: job } = await supabase
     .from('jobs')
-    .select('title, location, shift, safety_shoes_required, description, job_date, companies(name, street_address, city, province)')
+    .select('title, location, shift, safety_shoes_required, description, job_type, job_date, companies(name, street_address, city, province)')
     .eq('id', jobId)
     .single()
 
@@ -46,14 +46,17 @@ export async function broadcastJob(
 
   const result: BroadcastResult = { sent: 0, failed: [] }
 
-  type JobCompany = { name: string; street_address: string; city: string; province: string } | null
-  const company = job.companies as JobCompany
+  type JobCompany = { name: string; street_address: string; city: string; province: string }
+  const companiesRaw = job.companies as unknown
+  const company: JobCompany | null = Array.isArray(companiesRaw) ? companiesRaw[0] ?? null : companiesRaw as JobCompany | null
 
-  const jobDate = job.job_date
-    ? new Date(job.job_date + 'T00:00:00').toLocaleDateString('en-CA', {
-        weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-      })
-    : 'TBD'
+  const jobDate = job.job_type === 'full-time'
+    ? 'Full-time / Ongoing'
+    : job.job_date
+      ? new Date(job.job_date + 'T00:00:00').toLocaleDateString('en-CA', {
+          weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+        })
+      : 'TBD'
   const companyName = company?.name ?? job.location
   const companyAddress = company
     ? [company.street_address, company.city, company.province].filter(Boolean).join(', ')

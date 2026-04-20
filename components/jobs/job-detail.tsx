@@ -29,7 +29,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { DAY_LABELS, DAYS } from "@/lib/constants";
+import { DAY_LABELS } from "@/lib/constants";
 import { DatePicker } from "@/components/ui/date-picker";
 import { Counter } from "@/components/ui/counter";
 import { CompanyPicker } from "@/components/ui/company-picker";
@@ -37,7 +37,7 @@ import { formatCompanyLocation } from "@/lib/company-utils";
 import { formatPhone } from "@/lib/phone";
 import { Building2, MapPin, ShieldAlert, Users, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ShiftType, DayOfWeek, Company } from "@/lib/types";
+import type { ShiftType, JobType, Company } from "@/lib/types";
 
 const STATUS_STYLES: Record<string, string> = {
   open: "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400",
@@ -72,12 +72,10 @@ function JobInfo({
 
   const [title, setTitle] = useState(job.title);
   const [location, setLocation] = useState(job.location);
+  const [jobType, setJobType] = useState<JobType>(job.job_type);
   const [shift, setShift] = useState<ShiftType | "">(job.shift ?? "");
   const [description, setDescription] = useState(job.description ?? "");
   const [safetyShoes, setSafetyShoes] = useState(job.safety_shoes_required);
-  const [requiredDays, setRequiredDays] = useState<DayOfWeek[]>(
-    job.required_days ?? [],
-  );
   const [jobDate, setJobDate] = useState<string | null>(job.job_date ?? null);
   const [requiredMale, setRequiredMale] = useState(job.required_male ?? 0);
   const [requiredFemale, setRequiredFemale] = useState(
@@ -85,12 +83,6 @@ function JobInfo({
   );
   const [companies, setCompanies] = useState<Company[]>(initialCompanies);
   const [company, setCompany] = useState<Company | null>(initialCompany);
-
-  function toggleDay(day: DayOfWeek) {
-    setRequiredDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
-    );
-  }
 
   function handleCompanyChange(next: Company | null) {
     setCompany(next);
@@ -106,10 +98,10 @@ function JobInfo({
   function cancelEdit() {
     setTitle(job.title);
     setLocation(job.location);
+    setJobType(job.job_type);
     setShift(job.shift ?? "");
     setDescription(job.description ?? "");
     setSafetyShoes(job.safety_shoes_required);
-    setRequiredDays(job.required_days ?? []);
     setJobDate(job.job_date ?? null);
     setRequiredMale(job.required_male ?? 0);
     setRequiredFemale(job.required_female ?? 0);
@@ -136,11 +128,11 @@ function JobInfo({
       const result = await updateJob(job.id, {
         title: title.trim(),
         location: location.trim(),
+        job_type: jobType,
         shift: shift || undefined,
         description: description || undefined,
         safety_shoes_required: safetyShoes,
-        required_days: requiredDays,
-        job_date: jobDate,
+        job_date: jobType === 'on-call' ? jobDate : null,
         required_male: requiredMale,
         required_female: requiredFemale,
         company_id: company.id,
@@ -221,6 +213,35 @@ function JobInfo({
             />
           </div>
           <fieldset className="space-y-1.5">
+            <legend className="text-sm font-medium">Job type</legend>
+            <div className="flex gap-4">
+              {(["on-call", "full-time"] as JobType[]).map((t) => (
+                <label
+                  key={t}
+                  className="flex items-center gap-2 cursor-pointer min-h-[44px]"
+                >
+                  <input
+                    type="radio"
+                    checked={jobType === t}
+                    onChange={() => setJobType(t)}
+                    className="w-4 h-4"
+                  />
+                  <span className="capitalize">{t}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          {jobType === "on-call" && (
+            <div className="space-y-1.5">
+              <Label>Job date</Label>
+              <DatePicker
+                value={jobDate}
+                onChange={setJobDate}
+                placeholder="Select a date"
+              />
+            </div>
+          )}
+          <fieldset className="space-y-1.5">
             <legend className="text-sm font-medium">Shift</legend>
             <div className="flex gap-4">
               {(["day", "afternoon", "night"] as ShiftType[]).map((s) => (
@@ -236,30 +257,6 @@ function JobInfo({
                   />
                   <span className="capitalize">{s}</span>
                 </label>
-              ))}
-            </div>
-          </fieldset>
-          <fieldset className="space-y-1.5">
-            <legend className="text-sm font-medium">
-              Required days{" "}
-              <span className="text-muted-foreground font-normal text-xs">
-                (optional)
-              </span>
-            </legend>
-            <div className="flex flex-wrap gap-2">
-              {DAYS.map(({ value, label }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => toggleDay(value)}
-                  className={`px-3 py-2 rounded-md border text-sm font-medium min-h-[44px] transition-colors ${
-                    requiredDays.includes(value)
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background border-border hover:bg-muted"
-                  }`}
-                >
-                  {label}
-                </button>
               ))}
             </div>
           </fieldset>
@@ -280,19 +277,6 @@ function JobInfo({
             />
             <span className="text-sm font-medium">Safety shoes required</span>
           </label>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">
-              Job date{" "}
-              <span className="text-muted-foreground font-normal text-xs">
-                (optional)
-              </span>
-            </label>
-            <DatePicker
-              value={jobDate}
-              onChange={setJobDate}
-              placeholder="Select a date"
-            />
-          </div>
           <div className="space-y-3">
             <p className="text-sm font-medium">Workers needed</p>
             <div className="flex items-center justify-between">
@@ -339,7 +323,7 @@ function JobInfo({
             </dd>
           </div>
 
-          {/* Row 1: Location | Job date */}
+          {/* Row 1: City | Job type */}
           <div>
             <dt className="text-muted-foreground">City</dt>
             <dd className="font-medium flex items-center gap-1.5 mt-0.5">
@@ -348,29 +332,39 @@ function JobInfo({
             </dd>
           </div>
           <div>
-            <dt className="text-muted-foreground">Job date</dt>
-            <dd className="font-medium mt-0.5">
-              {job.job_date
-                ? new Date(job.job_date + "T00:00:00").toLocaleDateString(
-                    "en-CA",
-                    {
-                      weekday: "short",
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                    },
-                  )
-                : "—"}
+            <dt className="text-muted-foreground">Job type</dt>
+            <dd className="font-medium capitalize mt-0.5">
+              {job.job_type}
             </dd>
           </div>
 
-          {/* Row 2: Shift | Safety shoes */}
+          {/* Row 2: Job date (on-call only) | Shift */}
+          {job.job_type === "on-call" && (
+            <div>
+              <dt className="text-muted-foreground">Job date</dt>
+              <dd className="font-medium mt-0.5">
+                {job.job_date
+                  ? new Date(job.job_date + "T00:00:00").toLocaleDateString(
+                      "en-CA",
+                      {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      },
+                    )
+                  : "—"}
+              </dd>
+            </div>
+          )}
           <div>
             <dt className="text-muted-foreground">Shift</dt>
             <dd className="font-medium capitalize mt-0.5">
               {job.shift ?? "—"}
             </dd>
           </div>
+
+          {/* Row 3: Safety shoes | Workers needed */}
           <div>
             <dt className="text-muted-foreground">Safety shoes</dt>
             <dd className="font-medium flex items-center gap-1 mt-0.5">
@@ -382,16 +376,6 @@ function JobInfo({
               ) : (
                 "Not required"
               )}
-            </dd>
-          </div>
-
-          {/* Row 3: Required days | Workers needed */}
-          <div>
-            <dt className="text-muted-foreground">Required days</dt>
-            <dd className="font-medium mt-0.5">
-              {job.required_days?.length
-                ? job.required_days.map((d) => DAY_LABELS[d]).join(", ")
-                : "—"}
             </dd>
           </div>
           <div>
@@ -476,7 +460,11 @@ function MatchedWorkers({
   function toggle(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
       return next;
     });
   }
@@ -542,14 +530,12 @@ function MatchedWorkers({
                 selected.has(w.id)
                   ? "border-primary bg-primary/5"
                   : "border-border",
-                w.is_assigned && "opacity-60",
               )}
             >
               <input
                 type="checkbox"
                 checked={selected.has(w.id)}
-                onChange={() => !w.is_assigned && toggle(w.id)}
-                disabled={w.is_assigned}
+                onChange={() => toggle(w.id)}
                 className="w-4 h-4 shrink-0 cursor-pointer"
               />
               <Link
@@ -559,14 +545,20 @@ function MatchedWorkers({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="font-medium text-sm">{w.name}</span>
+                    <Badge
+                      variant="outline"
+                      className={cn("text-xs py-0", {
+                        "border-emerald-500 text-emerald-600 dark:text-emerald-400": w.tier === 1,
+                        "border-blue-500 text-blue-600 dark:text-blue-400": w.tier === 2,
+                        "border-amber-500 text-amber-600 dark:text-amber-400": w.tier === 3,
+                        "border-zinc-400 text-zinc-500": w.tier === 4,
+                      })}
+                    >
+                      Tier {w.tier}
+                    </Badge>
                     {w.location_match && (
                       <Badge variant="outline" className="text-xs gap-1 py-0">
                         <MapPin className="h-3 w-3" /> Local
-                      </Badge>
-                    )}
-                    {w.is_assigned && (
-                      <Badge className="text-xs bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400">
-                        Assigned
                       </Badge>
                     )}
                   </div>

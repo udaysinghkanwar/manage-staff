@@ -24,15 +24,17 @@ export async function POST(request: NextRequest) {
       template: {
         name: templateName,
         language: { code: 'en_US' },
-        components: [
-          {
-            type: 'body',
-            parameters: (templateParams as string[]).map((text: string) => ({
-              type: 'text',
-              text,
-            })),
-          },
-        ],
+        ...((templateParams as string[])?.length > 0 && {
+          components: [
+            {
+              type: 'body',
+              parameters: (templateParams as string[]).map((t: string) => ({
+                type: 'text',
+                text: t,
+              })),
+            },
+          ],
+        }),
       },
     }
   } else {

@@ -7,24 +7,31 @@ import { cn } from '@/lib/utils'
 async function getStats() {
   const supabase = await createClient()
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' })
 
   const [
     { count: totalWorkers },
-    { count: assignedWorkers },
     { count: openJobs },
     { count: recentYes },
+    { data: assignments },
   ] = await Promise.all([
     supabase.from('workers').select('*', { count: 'exact', head: true }).eq('status', 'active'),
-    supabase.from('job_assignments').select('worker_id', { count: 'exact', head: true })
-      .eq('jobs.status', 'open'),
     supabase.from('jobs').select('*', { count: 'exact', head: true }).eq('status', 'open'),
     supabase.from('job_broadcasts').select('*', { count: 'exact', head: true })
       .eq('response', 'yes').gte('responded_at', sevenDaysAgo),
+    // Fetch assignments with job status to count assigned workers correctly
+    supabase.from('job_assignments')
+      .select('worker_id, assigned_date, jobs!inner(status)')
+      .or(`assigned_date.eq.${today},assigned_date.is.null`)
+      .neq('jobs.status', 'cancelled'),
   ])
+
+  // Deduplicate by worker_id (a worker could have multiple assignments)
+  const assignedWorkers = new Set((assignments ?? []).map((a) => a.worker_id)).size
 
   return {
     totalWorkers: totalWorkers ?? 0,
-    assignedWorkers: assignedWorkers ?? 0,
+    assignedWorkers,
     openJobs: openJobs ?? 0,
     recentYes: recentYes ?? 0,
   }

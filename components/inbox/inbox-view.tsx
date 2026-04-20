@@ -51,8 +51,8 @@ function ConversationItem({
 }
 
 function MessageThread({
-  conv, onBack, onOptimisticSend,
-}: { conv: Conversation; onBack: () => void; onOptimisticSend: (text: string) => void }) {
+  conv, onBack, onOptimisticSend, onOptimisticFail,
+}: { conv: Conversation; onBack: () => void; onOptimisticSend: (text: string) => string; onOptimisticFail: (id: string) => void }) {
   const [replyText, setReplyText] = useState('')
   const [isPending, startTransition] = useTransition()
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -65,10 +65,13 @@ function MessageThread({
     const text = replyText.trim()
     if (!text) return
     setReplyText('')
-    onOptimisticSend(text)
+    const optimisticId = onOptimisticSend(text)
     startTransition(async () => {
       const result = await sendReply(conv.phone, text)
-      if (result.error) toast.error(result.error)
+      if (result.error) {
+        onOptimisticFail(optimisticId)
+        toast.error(result.error)
+      }
     })
   }
 
@@ -92,37 +95,44 @@ function MessageThread({
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
-        {conv.messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={cn(
-              'flex flex-col',
-              msg.direction === 'outbound' ? 'items-end' : 'items-start'
-            )}
-          >
+        {conv.messages.map((msg) => {
+          const isOptimistic = msg.id.startsWith('optimistic-')
+          const isFailed = msg.id.startsWith('failed-')
+          return (
             <div
+              key={msg.id}
               className={cn(
-                'max-w-[75%] rounded-2xl px-3 py-2 text-sm',
-                msg.direction === 'outbound'
-                  ? 'bg-primary text-primary-foreground rounded-br-sm'
-                  : 'bg-muted text-foreground rounded-bl-sm'
+                'flex flex-col',
+                msg.direction === 'outbound' ? 'items-end' : 'items-start'
               )}
             >
-              <p className="whitespace-pre-wrap break-words">{msg.body ?? ''}</p>
-              <p className={cn(
-                'text-xs mt-1',
-                msg.direction === 'outbound' ? 'text-primary-foreground/70 text-right' : 'text-muted-foreground'
-              )}>
-                {formatTime(msg.created_at)}
-              </p>
+              <div
+                className={cn(
+                  'max-w-[75%] rounded-2xl px-3 py-2 text-sm',
+                  msg.direction === 'outbound'
+                    ? 'bg-primary text-primary-foreground rounded-br-sm'
+                    : 'bg-muted text-foreground rounded-bl-sm',
+                  isOptimistic && 'opacity-60',
+                  isFailed && 'bg-destructive text-destructive-foreground'
+                )}
+              >
+                <p className="whitespace-pre-wrap break-words">{msg.body ?? ''}</p>
+                <p className={cn(
+                  'text-xs mt-1',
+                  msg.direction === 'outbound' ? 'text-primary-foreground/70 text-right' : 'text-muted-foreground',
+                  isFailed && 'text-destructive-foreground/70 text-right'
+                )}>
+                  {isFailed ? 'Failed to send' : isOptimistic ? 'Sending…' : formatTime(msg.created_at)}
+                </p>
+              </div>
+              {msg.is_availability_message && (
+                <span className="text-xs text-muted-foreground mt-0.5 px-1">
+                  ✦ auto-parsed
+                </span>
+              )}
             </div>
-            {msg.is_availability_message && (
-              <span className="text-xs text-muted-foreground mt-0.5 px-1">
-                ✦ auto-parsed
-              </span>
-            )}
-          </div>
-        ))}
+          )
+        })}
         <div ref={bottomRef} />
       </div>
 
@@ -166,79 +176,95 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
     setConversations(fresh)
   }, [])
 
-  function handleOptimisticSend(text: string) {
-    if (!selected) return
+  function handleOptimisticSend(text: string): string {
+    const id = `optimistic-${Date.now()}`
+    if (!selected) return id
     setConversations((prev) => prev.map((c) => {
       if (c.phone !== selected) return c
-      const optimistic = {
-        id: `optimistic-${Date.now()}`,
-        direction: 'outbound' as const,
+      const optimistic: Message = {
+        id,
+        phone: c.phone,
+        worker_id: c.worker_id,
+        direction: 'outbound',
         body: text,
         created_at: new Date().toISOString(),
         is_availability_message: false,
       }
       return { ...c, messages: [...c.messages, optimistic], last_message: text, last_at: optimistic.created_at }
     }))
+    return id
   }
 
-  // Realtime — listen to postgres_changes on messages table
+  function handleOptimisticFail(id: string) {
+    setConversations((prev) => prev.map((c) => ({
+      ...c,
+      messages: c.messages.map((m) =>
+        m.id === id ? { ...m, id: `failed-${Date.now()}` } : m
+      ),
+    })))
+  }
+
+  // Realtime — wait for session, then listen to postgres_changes on messages table
   useEffect(() => {
     const supabase = createClient()
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    let channel: ReturnType<typeof supabase.channel> | null = null
 
-    const channel = supabase
-      .channel('inbox-messages')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages' },
-        (payload) => {
-          const row = payload.new as {
-            id: string
-            phone: string
-            worker_id: string | null
-            direction: 'inbound' | 'outbound'
-            body: string | null
-            is_availability_message: boolean
-            created_at: string
-          }
-
-          setConversations((prev) => {
-            const existing = prev.find((c) => c.phone === row.phone)
-
-            const newMsg: Message = {
-              id: row.id,
-              phone: row.phone,
-              worker_id: row.worker_id,
-              direction: row.direction,
-              body: row.body,
-              is_availability_message: row.is_availability_message,
-              created_at: row.created_at,
+    supabase.auth.getSession().then(() => {
+      channel = supabase
+        .channel('inbox-messages')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'messages' },
+          (payload) => {
+            const row = payload.new as {
+              id: string
+              phone: string
+              worker_id: string | null
+              direction: 'inbound' | 'outbound'
+              body: string | null
+              is_availability_message: boolean
+              created_at: string
             }
 
-            if (existing) {
-              const filtered = existing.messages.filter(
-                (m) => !(m.id.startsWith('optimistic-') && m.body === row.body && m.direction === row.direction)
-              )
-              const updated: Conversation = {
-                ...existing,
-                messages: [...filtered, newMsg],
-                last_message: row.body,
-                last_at: row.created_at,
-                unread: existing.unread || (row.direction === 'inbound' && row.created_at > cutoff),
+            setConversations((prev) => {
+              const existing = prev.find((c) => c.phone === row.phone)
+
+              const newMsg: Message = {
+                id: row.id,
+                phone: row.phone,
+                worker_id: row.worker_id,
+                direction: row.direction,
+                body: row.body,
+                is_availability_message: row.is_availability_message,
+                created_at: row.created_at,
               }
-              const rest = prev.filter((c) => c.phone !== row.phone)
-              return [updated, ...rest]
-            }
 
-            // New phone number — fall back to refetch to get worker name
-            refetch()
-            return prev
-          })
-        }
-      )
-      .subscribe()
+              if (existing) {
+                const filtered = existing.messages.filter(
+                  (m) => !(m.id.startsWith('optimistic-') && m.body === row.body && m.direction === row.direction)
+                )
+                const updated: Conversation = {
+                  ...existing,
+                  messages: [...filtered, newMsg],
+                  last_message: row.body,
+                  last_at: row.created_at,
+                  unread: existing.unread || (row.direction === 'inbound' && row.created_at > cutoff),
+                }
+                const rest = prev.filter((c) => c.phone !== row.phone)
+                return [updated, ...rest]
+              }
 
-    return () => { supabase.removeChannel(channel) }
+              // New phone number — fall back to refetch to get worker name
+              refetch()
+              return prev
+            })
+          }
+        )
+        .subscribe()
+    })
+
+    return () => { if (channel) supabase.removeChannel(channel) }
   }, [refetch])
 
   if (conversations.length === 0) {
@@ -280,7 +306,7 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
         selected ? 'flex' : 'hidden md:flex'
       )}>
         {selectedConv ? (
-          <MessageThread conv={selectedConv} onBack={() => setSelected(null)} onOptimisticSend={handleOptimisticSend} />
+          <MessageThread conv={selectedConv} onBack={() => setSelected(null)} onOptimisticSend={handleOptimisticSend} onOptimisticFail={handleOptimisticFail} />
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
             Select a conversation

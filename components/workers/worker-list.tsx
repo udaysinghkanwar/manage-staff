@@ -2,10 +2,10 @@
 
 import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { FilterDropdown } from '@/components/ui/filter-dropdown'
-import { Users, Search, UserPlus, Phone, Calendar, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Users, Search, UserPlus, Phone, Calendar, X, SlidersHorizontal } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { DAY_LABELS } from '@/lib/constants'
@@ -17,6 +17,24 @@ type ShiftFilter  = 'all' | 'day' | 'afternoon' | 'night'
 type AvailFilter  = 'all' | 'full-time' | 'part-time'
 type AssignFilter = 'all' | 'available' | 'assigned'
 
+function Chip({
+  active, children, onClick,
+}: { active: boolean; children: React.ReactNode; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'inline-flex items-center text-xs font-medium px-3 py-1.5 rounded-full border transition-colors',
+        active
+          ? 'bg-primary text-primary-foreground border-primary'
+          : 'bg-transparent text-muted-foreground border-border hover:border-muted-foreground'
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
 export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
   const [search, setSearch]   = useState('')
   const [gender, setGender]   = useState<GenderFilter>('all')
@@ -24,15 +42,16 @@ export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
   const [avail, setAvail]     = useState<AvailFilter>('all')
   const [assign, setAssign]   = useState<AssignFilter>('all')
   const [location, setLocation] = useState('all')
+  const [showFilters, setShowFilters] = useState(false)
 
-  const isFiltered = search || gender !== 'all' || shift !== 'all' || avail !== 'all' || assign !== 'all' || location !== 'all'
+  const isFiltered = gender !== 'all' || shift !== 'all' || avail !== 'all' || assign !== 'all' || location !== 'all'
+  const activeFilterCount = [gender, shift, avail, assign, location].filter(v => v !== 'all').length
 
   function resetFilters() {
-    setSearch(''); setGender('all'); setShift('all')
+    setGender('all'); setShift('all')
     setAvail('all'); setAssign('all'); setLocation('all')
   }
 
-  // Extract unique locations from addresses
   const locations = useMemo(() => {
     const cities = new Set<string>()
     for (const w of workers) {
@@ -61,33 +80,55 @@ export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 px-6 py-4 border-b border-border">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">Workers</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">{workers.length} total</p>
+      <div className="flex flex-col gap-3 px-4 md:px-6 py-4 border-b border-border">
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">Workers</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">{workers.length} total</p>
+          </div>
+          <Link
+            href="/dashboard/workers/new"
+            className={cn(buttonVariants({ size: 'sm' }), 'gap-1.5 h-8 shrink-0')}
+          >
+            <UserPlus className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Add Worker</span>
+            <span className="sm:hidden">Add</span>
+          </Link>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="relative">
+
+        {/* Search + filter icon (mobile) */}
+        <div className="flex gap-2">
+          <div className="relative flex-1">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
             <Input
               placeholder="Search workers…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-8 h-8 w-48 text-sm"
+              className="pl-8 h-9 w-full text-sm"
             />
           </div>
-          <Link
-            href="/dashboard/workers/new"
-            className={cn(buttonVariants({ size: 'sm' }), 'gap-1.5 h-8')}
+          <button
+            onClick={() => setShowFilters(true)}
+            className={cn(
+              'md:hidden flex items-center justify-center h-9 w-9 rounded-lg border border-input shrink-0 transition-colors',
+              isFiltered ? 'bg-primary text-primary-foreground border-primary' : 'hover:bg-accent'
+            )}
           >
-            <UserPlus className="h-3.5 w-3.5" />
-            Add Worker
-          </Link>
+            <SlidersHorizontal className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
-      {/* Filter strip */}
-      <div className="flex items-end gap-4 px-6 py-4 border-b border-border flex-wrap min-h-[72px]">
+      {/* Status chips — mobile only */}
+      <div className="md:hidden flex items-center gap-2 px-4 py-3 border-b border-border overflow-x-auto">
+        <span className="text-xs font-medium text-muted-foreground shrink-0">Status</span>
+        <Chip active={assign === 'all'} onClick={() => setAssign('all')}>All</Chip>
+        <Chip active={assign === 'available'} onClick={() => setAssign('available')}>Available</Chip>
+        <Chip active={assign === 'assigned'} onClick={() => setAssign('assigned')}>Assigned</Chip>
+      </div>
+
+      {/* Filter strip — desktop only */}
+      <div className="hidden md:flex items-end gap-3 px-6 py-3 border-b border-border flex-wrap">
         <span className="text-xs font-medium text-muted-foreground mb-1 shrink-0">Filters</span>
         <FilterDropdown label="Gender" value={gender}
           onValueChange={(v) => setGender(v as GenderFilter)}
@@ -131,10 +172,9 @@ export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
             ]}
           />
         )}
-
         {isFiltered && (
           <div className="flex flex-col gap-1">
-            <span className="text-xs text-transparent select-none">·</span>
+            <span className="text-xs text-transparent select-none">&middot;</span>
             <button
               onClick={resetFilters}
               className="flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent border border-transparent hover:border-border transition-colors"
@@ -147,7 +187,7 @@ export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto px-6 py-6">
+      <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6">
         {workers.length === 0 ? (
           <Empty
             icon={<Users className="h-8 w-8" />}
@@ -155,7 +195,7 @@ export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
             description="Add your first worker to get started."
           />
         ) : filtered.length === 0 ? (
-          <p className="text-sm text-zinc-500 text-center py-12">
+          <p className="text-sm text-muted-foreground text-center py-12">
             No workers match the selected filters.
           </p>
         ) : (
@@ -166,6 +206,86 @@ export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
           </div>
         )}
       </div>
+
+      {/* Filter bottom sheet — mobile only */}
+      {showFilters && (
+        <div className="md:hidden fixed inset-0 z-50">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setShowFilters(false)}
+          />
+          {/* Sheet */}
+          <div className="absolute bottom-0 left-0 right-0 bg-card border-t border-border rounded-t-2xl max-h-[80vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+            </div>
+
+            <div className="flex items-center justify-between px-5 pb-4 pt-2">
+              <h2 className="text-lg font-semibold">Filters</h2>
+              <button
+                onClick={() => setShowFilters(false)}
+                className="p-1 rounded-full hover:bg-accent"
+              >
+                <X className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
+
+            <div className="px-5 pb-24 space-y-5">
+              {/* Status */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Status</p>
+                <div className="flex flex-wrap gap-2">
+                  <Chip active={assign === 'all'} onClick={() => setAssign('all')}>All</Chip>
+                  <Chip active={assign === 'available'} onClick={() => setAssign('available')}>Available</Chip>
+                  <Chip active={assign === 'assigned'} onClick={() => setAssign('assigned')}>Assigned</Chip>
+                </div>
+              </div>
+
+              {/* Shift */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Shift</p>
+                <div className="flex flex-wrap gap-2">
+                  <Chip active={shift === 'all'} onClick={() => setShift('all')}>All</Chip>
+                  <Chip active={shift === 'day'} onClick={() => setShift('day')}>Day</Chip>
+                  <Chip active={shift === 'afternoon'} onClick={() => setShift('afternoon')}>Afternoon</Chip>
+                  <Chip active={shift === 'night'} onClick={() => setShift('night')}>Night</Chip>
+                </div>
+              </div>
+
+              {/* Gender */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Gender</p>
+                <div className="flex flex-wrap gap-2">
+                  <Chip active={gender === 'all'} onClick={() => setGender('all')}>All</Chip>
+                  <Chip active={gender === 'male'} onClick={() => setGender('male')}>Male</Chip>
+                  <Chip active={gender === 'female'} onClick={() => setGender('female')}>Female</Chip>
+                </div>
+              </div>
+
+              {/* Availability */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Availability</p>
+                <div className="flex flex-wrap gap-2">
+                  <Chip active={avail === 'all'} onClick={() => setAvail('all')}>All</Chip>
+                  <Chip active={avail === 'full-time'} onClick={() => setAvail('full-time')}>Full-Time</Chip>
+                  <Chip active={avail === 'part-time'} onClick={() => setAvail('part-time')}>Part-Time</Chip>
+                </div>
+              </div>
+
+              {/* Reset */}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => { resetFilters(); setShowFilters(false) }}
+              >
+                Reset all filters
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -177,7 +297,7 @@ function WorkerCard({ worker }: { worker: WorkerWithAssignment }) {
     <Link
       href={`/dashboard/workers/${worker.id}`}
       className={cn(
-        'group block rounded-xl bg-card border border-border p-4 transition-all hover:bg-accent',
+        'group block rounded-xl bg-card border border-border p-3 md:p-4 transition-all hover:bg-accent overflow-hidden',
         worker.is_assigned && 'border-amber-500/30 hover:border-amber-500/50'
       )}
     >
@@ -231,8 +351,6 @@ function CoffeeChip({ children }: { children: React.ReactNode }) {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-
-
 function Empty({
   icon, title, description,
 }: {
@@ -242,9 +360,9 @@ function Empty({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="text-zinc-700 mb-4">{icon}</div>
-      <p className="text-sm font-medium text-zinc-400">{title}</p>
-      <p className="text-xs text-zinc-600 mt-1">{description}</p>
+      <div className="text-muted-foreground mb-4">{icon}</div>
+      <p className="text-sm font-medium text-muted-foreground">{title}</p>
+      <p className="text-xs text-muted-foreground mt-1">{description}</p>
     </div>
   )
 }

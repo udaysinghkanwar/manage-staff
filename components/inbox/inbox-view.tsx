@@ -1,12 +1,14 @@
 'use client'
 
 import { useState, useEffect, useRef, useTransition, useCallback } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { getConversations, sendReply } from '@/lib/inbox'
 import type { Conversation, Message } from '@/lib/inbox'
 import { Button } from '@/components/ui/button'
-import { MessageSquare, ChevronLeft, Send } from 'lucide-react'
+import { MessageSquare, ChevronLeft, Send, ExternalLink, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatPhone } from '@/lib/phone'
 import { toast } from 'sonner'
 
 function formatTime(iso: string) {
@@ -18,9 +20,23 @@ function formatTime(iso: string) {
     : d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })
 }
 
+function getInitials(name: string) {
+  return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
+}
+
+function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }) {
+  const s = size === 'sm' ? 'h-8 w-8 text-xs' : 'h-9 w-9 text-sm'
+  return (
+    <div className={cn('rounded-full bg-primary/20 text-primary font-semibold flex items-center justify-center shrink-0', s)}>
+      {getInitials(name)}
+    </div>
+  )
+}
+
 function ConversationItem({
   conv, active, onClick,
 }: { conv: Conversation; active: boolean; onClick: () => void }) {
+  const displayName = conv.worker_name ?? formatPhone(conv.phone)
   return (
     <button
       onClick={onClick}
@@ -29,23 +45,24 @@ function ConversationItem({
         active ? 'bg-muted' : 'hover:bg-muted/50'
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-medium text-sm truncate">
-          {conv.worker_name ?? conv.phone}
-        </span>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {conv.unread && (
-            <span className="w-2 h-2 rounded-full bg-primary" />
-          )}
-          <span className="text-xs text-muted-foreground">{formatTime(conv.last_at)}</span>
+      <div className="flex items-start gap-3">
+        <Avatar name={conv.worker_name ?? conv.phone} size="sm" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-semibold text-sm truncate">{displayName}</span>
+            <span className="text-xs text-muted-foreground shrink-0">{formatTime(conv.last_at)}</span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">{formatPhone(conv.phone)}</p>
+          <div className="flex items-center gap-1.5 mt-1">
+            {conv.unread && (
+              <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+            )}
+            <p className="text-xs text-muted-foreground truncate">
+              {conv.last_message ?? '—'}
+            </p>
+          </div>
         </div>
       </div>
-      {conv.worker_name && (
-        <p className="text-xs text-muted-foreground mt-0.5">{conv.phone}</p>
-      )}
-      <p className="text-xs text-muted-foreground mt-1 truncate">
-        {conv.last_message ?? '—'}
-      </p>
     </button>
   )
 }
@@ -75,26 +92,39 @@ function MessageThread({
     })
   }
 
+  const displayName = conv.worker_name ?? formatPhone(conv.phone)
+
   return (
     <div className="flex flex-col h-full">
       {/* Thread header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-border shrink-0">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border shrink-0">
         <button
           onClick={onBack}
           className="md:hidden p-1 -ml-1 rounded-md hover:bg-muted"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <div>
-          <p className="font-medium text-sm">{conv.worker_name ?? conv.phone}</p>
-          {conv.worker_name && (
-            <p className="text-xs text-muted-foreground">{conv.phone}</p>
-          )}
+        <Avatar name={displayName} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <p className="font-semibold text-sm truncate">{displayName}</p>
+            {conv.worker_id && (
+              <Link href={`/dashboard/workers/${conv.worker_id}`} className="text-muted-foreground hover:text-foreground">
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Link>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground">{formatPhone(conv.phone)}</p>
         </div>
+        {conv.worker_id && (
+          <span className="shrink-0 text-xs font-medium px-2.5 py-0.5 rounded-full border border-emerald-600/60 text-emerald-400">
+            Available
+          </span>
+        )}
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2">
+      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {conv.messages.map((msg) => {
           const isOptimistic = msg.id.startsWith('optimistic-')
           const isFailed = msg.id.startsWith('failed-')
@@ -106,9 +136,15 @@ function MessageThread({
                 msg.direction === 'outbound' ? 'items-end' : 'items-start'
               )}
             >
+              {msg.is_availability_message && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 mb-1">
+                  <Check className="h-3 w-3" />
+                  auto-parsed
+                </span>
+              )}
               <div
                 className={cn(
-                  'max-w-[75%] rounded-2xl px-3 py-2 text-sm',
+                  'max-w-[75%] rounded-2xl px-3.5 py-2.5 text-sm',
                   msg.direction === 'outbound'
                     ? 'bg-primary text-primary-foreground rounded-br-sm'
                     : 'bg-muted text-foreground rounded-bl-sm',
@@ -118,18 +154,13 @@ function MessageThread({
               >
                 <p className="whitespace-pre-wrap break-words">{msg.body ?? ''}</p>
                 <p className={cn(
-                  'text-xs mt-1',
-                  msg.direction === 'outbound' ? 'text-primary-foreground/70 text-right' : 'text-muted-foreground',
+                  'text-xs mt-1.5',
+                  msg.direction === 'outbound' ? 'text-primary-foreground/60 text-right' : 'text-muted-foreground',
                   isFailed && 'text-destructive-foreground/70 text-right'
                 )}>
                   {isFailed ? 'Failed to send' : isOptimistic ? 'Sending…' : formatTime(msg.created_at)}
                 </p>
               </div>
-              {msg.is_availability_message && (
-                <span className="text-xs text-muted-foreground mt-0.5 px-1">
-                  ✦ auto-parsed
-                </span>
-              )}
             </div>
           )
         })}
@@ -137,29 +168,32 @@ function MessageThread({
       </div>
 
       {/* Reply input */}
-      <div className="shrink-0 border-t border-border p-3 flex gap-2 items-end">
-        <textarea
-          value={replyText}
-          onChange={(e) => setReplyText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              handleSend()
-            }
-          }}
-          placeholder="Type a reply…"
-          rows={1}
-          className="flex-1 resize-none rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring min-h-[44px] max-h-32"
-          style={{ fieldSizing: 'content' } as React.CSSProperties}
-        />
-        <Button
-          onClick={handleSend}
-          disabled={isPending || !replyText.trim()}
-          size="icon"
-          className="shrink-0 min-h-[44px] min-w-[44px]"
-        >
-          <Send className="h-4 w-4" />
-        </Button>
+      <div className="shrink-0 border-t border-border px-4 pt-3 pb-2">
+        <div className="flex gap-2 items-end">
+          <textarea
+            value={replyText}
+            onChange={(e) => setReplyText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                handleSend()
+              }
+            }}
+            placeholder="Type a reply…"
+            rows={1}
+            className="flex-1 resize-none rounded-xl border border-input bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring min-h-[44px] max-h-32"
+            style={{ fieldSizing: 'content' } as React.CSSProperties}
+          />
+          <Button
+            onClick={handleSend}
+            disabled={isPending || !replyText.trim()}
+            size="icon"
+            className="shrink-0 min-h-[44px] min-w-[44px] rounded-xl"
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
+        <p className="text-xs text-muted-foreground mt-1.5 mb-1">Enter to send &middot; Shift+Enter for new line</p>
       </div>
     </div>
   )
@@ -212,7 +246,7 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
 
     supabase.auth.getSession().then(() => {
       channel = supabase
-        .channel('inbox-messages')
+        .channel(`inbox-messages-${Date.now()}`)
         .on(
           'postgres_changes',
           { event: 'INSERT', schema: 'public', table: 'messages' },
@@ -283,7 +317,7 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
     <div className="flex h-[calc(100vh-4rem)] md:h-screen overflow-hidden">
       {/* Conversation list */}
       <div className={cn(
-        'w-full md:w-72 md:border-r md:border-border flex-col overflow-y-auto shrink-0',
+        'w-full md:w-80 md:border-r md:border-border flex-col overflow-y-auto shrink-0',
         selected ? 'hidden md:flex' : 'flex'
       )}>
         <div className="px-4 py-4 border-b border-border">

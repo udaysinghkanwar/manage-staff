@@ -63,6 +63,10 @@ export async function getConversations(): Promise<Conversation[]> {
     conv.messages.push(msg)
     conv.last_message = row.body
     conv.last_at = row.created_at
+    if (!conv.worker_name && (worker as { name?: string } | null)?.name) {
+      conv.worker_name = (worker as { name?: string }).name
+      conv.worker_id = row.worker_id
+    }
     if (row.direction === 'inbound' && row.created_at > cutoff) {
       conv.unread = true
     }

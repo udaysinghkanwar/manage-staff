@@ -150,7 +150,7 @@ async function sendOnboarding(phone: string) {
   try {
     await fetch(`${getBaseUrl()}/api/whatsapp/send`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY! },
       body: JSON.stringify({
         to: phone,
         type: 'text',
@@ -166,7 +166,7 @@ async function sendConfirmation(phone: string) {
   try {
     await fetch(`${getBaseUrl()}/api/whatsapp/send`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY! },
       body: JSON.stringify({
         to: phone,
         type: 'text',

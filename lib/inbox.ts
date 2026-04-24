@@ -84,7 +84,7 @@ export async function sendReply(phone: string, body: string): Promise<{ error: s
 
   const res = await fetch(`${baseUrl}/api/whatsapp/send`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY! },
     body: JSON.stringify({ to: phone, type: 'text', text: body }),
   })
 

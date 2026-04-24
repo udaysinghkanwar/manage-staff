@@ -66,7 +66,7 @@ export async function broadcastJob(
     try {
       const res = await fetch(`${baseUrl}/api/whatsapp/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY! },
         body: JSON.stringify({
           to: worker.phone,
           type: 'template',

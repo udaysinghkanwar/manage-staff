@@ -1,9 +1,21 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { logMessage } from '@/lib/whatsapp/log-message'
 
 const GRAPH_URL = `https://graph.facebook.com/v22.0/${process.env.META_PHONE_NUMBER_ID}/messages`
 
 export async function POST(request: NextRequest) {
+  // Allow internal server-to-server calls (from server actions / webhook handlers)
+  // but block unauthenticated external requests
+  const isInternalCall = request.headers.get('x-internal-secret') === process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!isInternalCall) {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user && process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH !== 'true') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+  }
+
   const body = await request.json()
   const { to, type, templateName, templateParams, text } = body
 

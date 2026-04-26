@@ -29,7 +29,7 @@ Critical differences from earlier versions:
 
 ### Auth & Session Flow
 
-Authentication is magic-link only (single shared email account). Session handling is split across three Supabase client helpers:
+Authentication is email + password via Supabase Auth. Public sign-ups are disabled — accounts are created manually by the admin in Supabase Studio (Authentication → Users → Add user). Each company employee gets their own login. Session handling is split across three Supabase client helpers:
 
 - `lib/supabase/client.ts` — browser client (`createBrowserClient`); used in Client Components and hooks
 - `lib/supabase/server.ts` — async server client (`createServerClient` + `cookies()`); used in Server Components, Route Handlers, and Server Actions
@@ -37,7 +37,7 @@ Authentication is magic-link only (single shared email account). Session handlin
 
 **Use `getUser()` for all authorization checks** — `getSession()` returns unverified cookie data and must not be used for access decisions.
 
-The auth callback route (`app/auth/callback/route.ts`) exchanges the OTP code for a session and redirects to `/dashboard`.
+The login form at `app/login/page.tsx` uses `supabase.auth.signInWithPassword`, which sets cookies directly — no callback round-trip is needed. The `app/auth/callback/route.ts` route is retained for future OAuth/magic-link flows but is not part of the email+password path.
 
 ### Database
 

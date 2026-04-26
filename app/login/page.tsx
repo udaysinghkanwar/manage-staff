@@ -1,21 +1,19 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useSearchParams } from 'next/navigation'
-import { Suspense } from 'react'
 
 const DEV_BYPASS = process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === 'true'
 
 function LoginForm() {
   const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [sent, setSent] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const hasError = searchParams.get('error')
@@ -31,58 +29,35 @@ function LoginForm() {
       setError('Please enter a valid email address.')
       return
     }
+    if (!password) {
+      setError('Please enter your password.')
+      return
+    }
 
     setLoading(true)
     const supabase = createClient()
-    const origin = window.location.origin
 
-    const { error: otpError } = await supabase.auth.signInWithOtp({
+    const { error: authError } = await supabase.auth.signInWithPassword({
       email: trimmed,
-      options: {
-        emailRedirectTo: `${origin}/auth/callback`,
-        shouldCreateUser: false,
-      },
+      password,
     })
 
     setLoading(false)
 
-    if (otpError) {
-      setError(otpError.message)
-    } else {
-      setSent(true)
+    if (authError) {
+      setError('Invalid email or password.')
+      return
     }
-  }
 
-  if (sent) {
-    return (
-      <Card className="w-full max-w-sm">
-        <CardHeader className="space-y-1 pb-4">
-          <CardTitle className="text-2xl">Check your email</CardTitle>
-          <CardDescription>
-            We sent a login link to <span className="font-medium text-foreground">{email}</span>.
-            Tap the link to sign in.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button
-            variant="outline"
-            className="w-full min-h-[44px]"
-            onClick={() => { setSent(false); setEmail('') }}
-          >
-            Use a different email
-          </Button>
-        </CardContent>
-      </Card>
-    )
+    router.push('/dashboard')
+    router.refresh()
   }
 
   return (
     <Card className="w-full max-w-sm">
       <CardHeader className="space-y-1 pb-4">
         <CardTitle className="text-2xl">Sign in</CardTitle>
-        <CardDescription>
-          Enter your email to receive a login link.
-        </CardDescription>
+        <CardDescription>Enter your work email and password.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -95,6 +70,7 @@ function LoginForm() {
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
+              name="email"
               type="email"
               placeholder="you@example.com"
               value={email}
@@ -105,12 +81,25 @@ function LoginForm() {
               className="min-h-[44px] text-base"
             />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              name="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+              required
+              className="min-h-[44px] text-base"
+            />
+          </div>
           <Button
             type="submit"
             className="w-full min-h-[44px] text-base"
             disabled={loading}
           >
-            {loading ? 'Sending…' : 'Send login link'}
+            {loading ? 'Signing in…' : 'Sign in'}
           </Button>
 
           {DEV_BYPASS && (

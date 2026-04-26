@@ -27,9 +27,9 @@ const COLS = [
 
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-muted/40 px-6 py-12">
+    <footer className="border-t border-border bg-muted/40 px-6 py-9 sm:py-12">
       <div className="mx-auto max-w-6xl">
-        <div className="mb-10 flex flex-wrap justify-between gap-10">
+        <div className="mb-8 flex flex-col gap-8 sm:mb-10 sm:flex-row sm:flex-wrap sm:justify-between sm:gap-10">
           <div className="max-w-[220px]">
             <div className="mb-2 flex items-center gap-2 font-bold text-foreground">
               <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-background">
@@ -48,6 +48,7 @@ export function Footer() {
             </a>
           </div>
 
+          <div className="grid grid-cols-2 gap-6 sm:flex sm:flex-row sm:gap-10">
           {COLS.map((col) => (
             <div key={col.heading}>
               <p className="mb-3 text-xs font-bold uppercase tracking-wider text-foreground">
@@ -67,9 +68,10 @@ export function Footer() {
               </ul>
             </div>
           ))}
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border pt-6">
+        <div className="flex flex-col items-start gap-3 border-t border-border pt-5 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4 sm:pt-6">
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} Manage Staff. All rights reserved.
           </p>

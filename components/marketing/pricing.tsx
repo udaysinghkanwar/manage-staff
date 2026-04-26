@@ -59,28 +59,28 @@ const PLANS = [
 
 export function Pricing() {
   return (
-    <section id="pricing" className="py-24">
+    <section id="pricing" className="py-14 sm:py-20 lg:py-24">
       <div className="mx-auto max-w-6xl px-6">
-        <div className="mb-16 text-center">
+        <div className="mb-10 text-center sm:mb-16">
           <span className="inline-block rounded-full bg-[#e8faf1] px-3 py-1 text-xs font-semibold uppercase tracking-widest text-[#1aab52]">
             Pricing
           </span>
-          <h2 className="mt-3 text-4xl font-extrabold tracking-tight text-foreground lg:text-5xl">
+          <h2 className="mt-3 text-[26px] font-extrabold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
             Simple, honest pricing
           </h2>
-          <p className="mx-auto mt-3 max-w-md text-lg text-muted-foreground">
+          <p className="mx-auto mt-3 max-w-md text-sm text-muted-foreground sm:text-base lg:text-lg">
             No per-message fees. No hidden charges. Cancel any time.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 items-start gap-5 md:grid-cols-3">
+        <div className="grid grid-cols-1 items-start gap-4 sm:gap-5 md:grid-cols-3">
           {PLANS.map((plan) => (
             <Card
               key={plan.name}
               className={cn(
-                "relative p-8",
+                "relative p-6 sm:p-8",
                 plan.popular &&
-                  "border-[#25D366] shadow-[0_0_0_1px_#25D366,0_20px_48px_rgba(37,211,102,0.12)]",
+                  "order-first border-[#25D366] shadow-[0_0_0_1px_#25D366,0_20px_48px_rgba(37,211,102,0.12)] md:order-0",
               )}
             >
               {plan.popular && (

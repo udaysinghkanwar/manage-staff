@@ -43,27 +43,27 @@ const FEATURES = [
 
 export function Features() {
   return (
-    <section id="features" className="bg-muted/40 py-24">
+    <section id="features" className="bg-muted/40 py-14 sm:py-20 lg:py-24">
       <div className="mx-auto max-w-6xl px-6">
-        <div className="mb-16 text-center">
+        <div className="mb-10 text-center sm:mb-16">
           <span className="inline-block rounded-full bg-[#e8faf1] px-3 py-1 text-xs font-semibold uppercase tracking-widest text-[#1aab52]">
             Features
           </span>
-          <h2 className="mt-3 text-4xl font-extrabold tracking-tight text-foreground lg:text-5xl">
+          <h2 className="mt-3 text-[26px] font-extrabold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
             Everything you need, nothing you don&apos;t
           </h2>
         </div>
 
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-5 lg:grid-cols-3">
           {FEATURES.map((f) => {
             const Icon = f.icon
             return (
-              <Card key={f.title} className="p-7 transition-shadow hover:shadow-md">
-                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-[#e8faf1] text-[#1aab52]">
+              <Card key={f.title} className="p-5 transition-shadow hover:shadow-md sm:p-7">
+                <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-xl bg-[#e8faf1] text-[#1aab52] sm:mb-4 sm:h-11 sm:w-11">
                   <Icon className="h-5 w-5" />
                 </div>
-                <h3 className="mb-1.5 text-base font-bold text-foreground">{f.title}</h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">{f.desc}</p>
+                <h3 className="mb-1 text-[15px] font-bold text-foreground sm:mb-1.5 sm:text-base">{f.title}</h3>
+                <p className="text-[13px] leading-relaxed text-muted-foreground sm:text-sm">{f.desc}</p>
               </Card>
             )
           })}

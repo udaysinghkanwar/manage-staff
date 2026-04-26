@@ -30,13 +30,13 @@ export function FAQ() {
   const [open, setOpen] = useState<number | null>(0)
 
   return (
-    <section id="faq" className="bg-muted/40 py-24">
+    <section id="faq" className="bg-muted/40 py-14 sm:py-20 lg:py-24">
       <div className="mx-auto max-w-6xl px-6">
-        <div className="mb-16 text-center">
+        <div className="mb-8 text-center sm:mb-16">
           <span className="inline-block rounded-full bg-[#e8faf1] px-3 py-1 text-xs font-semibold uppercase tracking-widest text-[#1aab52]">
             FAQ
           </span>
-          <h2 className="mt-3 text-4xl font-extrabold tracking-tight text-foreground lg:text-5xl">
+          <h2 className="mt-3 text-[26px] font-extrabold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
             Common questions
           </h2>
         </div>
@@ -49,7 +49,7 @@ export function FAQ() {
                 <button
                   type="button"
                   onClick={() => setOpen(isOpen ? null : i)}
-                  className="flex w-full items-center justify-between gap-4 py-5 text-left text-base font-semibold text-foreground transition-colors hover:text-foreground"
+                  className="flex w-full items-center justify-between gap-3 py-4 text-left text-sm font-semibold text-foreground transition-colors hover:text-foreground sm:gap-4 sm:py-5 sm:text-base"
                 >
                   {item.q}
                   <span
@@ -68,7 +68,7 @@ export function FAQ() {
                   </span>
                 </button>
                 {isOpen && (
-                  <p className="pb-5 text-[15px] leading-relaxed text-muted-foreground">
+                  <p className="pb-4 text-[13px] leading-relaxed text-muted-foreground sm:pb-5 sm:text-[15px]">
                     {item.a}
                   </p>
                 )}

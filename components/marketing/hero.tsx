@@ -5,38 +5,41 @@ import { cn } from "@/lib/utils";
 
 export function Hero() {
   return (
-    <section className="overflow-hidden px-6 pb-24 pt-20">
-      <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-16 lg:grid-cols-2">
+    <section className="overflow-hidden px-6 pb-16 pt-10 sm:pb-20 sm:pt-14 lg:pb-24 lg:pt-20">
+      <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 sm:gap-12 lg:grid-cols-2 lg:gap-16">
         <div>
           <div className="mb-5 inline-flex items-center gap-2 rounded-full bg-[#e8faf1] px-3 py-1 text-xs font-semibold uppercase tracking-widest text-[#1aab52]">
             <WhatsAppIcon className="h-3 w-3" />
             WhatsApp-native workflow
           </div>
 
-          <h1 className="mb-5 text-5xl font-extrabold leading-[1.08] tracking-tight text-foreground lg:text-[64px]">
+          <h1 className="mb-4 text-[36px] font-extrabold leading-[1.1] tracking-tight text-foreground sm:text-5xl sm:leading-[1.08] sm:mb-5 lg:text-[64px]">
             Stop chasing workers
             <br />
             through <span className="text-[#25D366]">scattered chats</span>
           </h1>
 
-          <p className="mb-9 max-w-lg text-lg leading-relaxed text-muted-foreground">
+          <p className="mb-7 max-w-lg text-base leading-relaxed text-muted-foreground sm:mb-9 sm:text-lg">
             Broadcast jobs, collect YES/NO replies, and auto-assign your casual
             workers — all through the WhatsApp they already use.
           </p>
 
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col items-stretch gap-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
             <Link
               href="/login"
               className={cn(
                 buttonVariants({ size: "lg" }),
-                "gap-2 bg-[#25D366] hover:bg-[#1aab52] text-white border-transparent",
+                "h-12 gap-2 bg-[#25D366] hover:bg-[#1aab52] text-white border-transparent text-base sm:h-9 sm:text-sm",
               )}
             >
               Get started free <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href="#how-it-works"
-              className={cn(buttonVariants({ variant: "outline", size: "lg" }))}
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "h-12 text-base sm:h-9 sm:text-sm",
+              )}
             >
               See how it works
             </Link>
@@ -51,7 +54,7 @@ export function Hero() {
         </div>
 
         <div className="flex justify-center">
-          <div className="relative h-[540px] w-[272px] rounded-[36px] bg-zinc-900 p-3 shadow-2xl ring-1 ring-white/10">
+          <div className="relative h-[440px] w-[230px] rounded-[32px] bg-zinc-900 p-2.5 shadow-2xl ring-1 ring-white/10 sm:h-[480px] sm:w-[252px] lg:h-[540px] lg:w-[272px] lg:rounded-[36px] lg:p-3">
             <div className="mx-auto mb-2 h-6 w-24 rounded-full bg-black" />
             <div className="flex h-[calc(100%-40px)] flex-col overflow-hidden rounded-[26px] bg-[#e5ddd5]">
               <div className="flex items-center gap-2.5 bg-[#075e54] px-3 py-2.5">

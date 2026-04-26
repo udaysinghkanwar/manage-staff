@@ -24,21 +24,21 @@ const STEPS = [
 
 export function HowItWorks() {
   return (
-    <section id="how-it-works" className="py-24">
+    <section id="how-it-works" className="py-14 sm:py-20 lg:py-24">
       <div className="mx-auto max-w-6xl px-6">
-        <div className="mb-16 text-center">
+        <div className="mb-10 text-center sm:mb-16">
           <span className="inline-block rounded-full bg-[#e8faf1] px-3 py-1 text-xs font-semibold uppercase tracking-widest text-[#1aab52]">
             How it works
           </span>
-          <h2 className="mt-3 text-4xl font-extrabold tracking-tight text-foreground lg:text-5xl">
+          <h2 className="mt-3 text-[26px] font-extrabold tracking-tight text-foreground sm:text-4xl lg:text-5xl">
             Three steps to fill every shift
           </h2>
-          <p className="mx-auto mt-3 max-w-xl text-lg text-muted-foreground">
+          <p className="mx-auto mt-3 max-w-xl text-sm text-muted-foreground sm:text-base lg:text-lg">
             No training, no new apps, no confusion. Your workers already know WhatsApp.
           </p>
         </div>
 
-        <div className="relative grid grid-cols-1 gap-12 md:grid-cols-3">
+        <div className="relative grid grid-cols-1 gap-8 sm:gap-12 md:grid-cols-3">
           <div className="absolute left-[16.66%] right-[16.66%] top-8 hidden h-px bg-gradient-to-r from-border via-[#25D366] to-border md:block" />
 
           {STEPS.map((step) => {
@@ -47,7 +47,7 @@ export function HowItWorks() {
               <div key={step.num} className="flex flex-col items-center text-center">
                 <div
                   className={[
-                    'relative z-10 mb-5 flex h-16 w-16 items-center justify-center rounded-full text-xl font-extrabold ring-4 ring-background',
+                    'relative z-10 mb-4 flex h-14 w-14 items-center justify-center rounded-full text-lg font-extrabold ring-4 ring-background sm:mb-5 sm:h-16 sm:w-16 sm:text-xl',
                     step.highlight
                       ? 'bg-[#25D366] text-white shadow-[0_8px_24px_rgba(37,211,102,0.35)]'
                       : 'bg-foreground text-background',
@@ -55,9 +55,9 @@ export function HowItWorks() {
                 >
                   {step.num}
                 </div>
-                <Icon className="mb-3 h-7 w-7 text-[#25D366]" />
-                <h3 className="mb-2 text-lg font-bold text-foreground">{step.title}</h3>
-                <p className="text-sm leading-relaxed text-muted-foreground">{step.desc}</p>
+                <Icon className="mb-2.5 h-6 w-6 text-[#25D366] sm:mb-3 sm:h-7 sm:w-7" />
+                <h3 className="mb-1.5 text-base font-bold text-foreground sm:mb-2 sm:text-lg">{step.title}</h3>
+                <p className="max-w-xs text-[13px] leading-relaxed text-muted-foreground sm:text-sm">{step.desc}</p>
               </div>
             )
           })}

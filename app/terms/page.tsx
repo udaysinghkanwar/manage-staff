@@ -126,10 +126,10 @@ export default function TermsPage() {
             <p className="text-muted-foreground">
               Questions about these terms? Email{' '}
               <a
-                href="mailto:hello@managestaff.app"
+                href="mailto:hello@managestaff.ca"
                 className="font-medium text-[#1aab52] hover:underline"
               >
-                hello@managestaff.app
+                hello@managestaff.ca
               </a>
               .
             </p>

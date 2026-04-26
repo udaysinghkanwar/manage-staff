@@ -82,6 +82,17 @@ create table public.messages (
   created_at              timestamptz not null default now()
 );
 
+-- ---------------------------------------------------------------
+-- WAITLIST
+-- Landing-page signups; populated by a Server Action using the
+-- service role key (anon role has no insert policy).
+-- ---------------------------------------------------------------
+create table public.waitlist (
+  id         uuid        primary key default gen_random_uuid(),
+  email      text        not null unique,
+  created_at timestamptz not null default now()
+);
+
 -- =============================================================
 -- UPDATED_AT TRIGGER
 -- =============================================================
@@ -111,6 +122,7 @@ alter table public.jobs           enable row level security;
 alter table public.job_assignments enable row level security;
 alter table public.job_broadcasts  enable row level security;
 alter table public.messages        enable row level security;
+alter table public.waitlist        enable row level security;
 
 -- Authenticated users have full access; no public access.
 create policy "authenticated full access" on public.workers
@@ -138,6 +150,12 @@ create policy "authenticated full access" on public.job_broadcasts
   with check (true);
 
 create policy "authenticated full access" on public.messages
+  for all
+  to authenticated
+  using (true)
+  with check (true);
+
+create policy "authenticated full access" on public.waitlist
   for all
   to authenticated
   using (true)

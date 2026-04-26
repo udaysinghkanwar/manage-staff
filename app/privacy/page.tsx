@@ -113,10 +113,10 @@ export default function PrivacyPage() {
             <p className="text-muted-foreground">
               For any privacy questions or requests, email{' '}
               <a
-                href="mailto:hello@managestaff.app"
+                href="mailto:hello@managestaff.ca"
                 className="font-medium text-[#1aab52] hover:underline"
               >
-                hello@managestaff.app
+                hello@managestaff.ca
               </a>
               .
             </p>

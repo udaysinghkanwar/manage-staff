@@ -17,8 +17,8 @@ const PLANS = [
       "Basic availability tracking",
       "Email support",
     ],
-    cta: "Get started",
-    href: "/login",
+    cta: "Contact us",
+    href: "#contact",
     popular: false,
   },
   {
@@ -34,8 +34,8 @@ const PLANS = [
       "Message history & search",
       "Priority support",
     ],
-    cta: "Get started",
-    href: "/login",
+    cta: "Contact us",
+    href: "#contact",
     popular: true,
   },
   {
@@ -78,7 +78,7 @@ export function Pricing() {
             <Card
               key={plan.name}
               className={cn(
-                "relative p-6 sm:p-8",
+                "relative overflow-visible p-6 sm:p-8",
                 plan.popular &&
                   "order-first border-[#25D366] shadow-[0_0_0_1px_#25D366,0_20px_48px_rgba(37,211,102,0.12)] md:order-0",
               )}

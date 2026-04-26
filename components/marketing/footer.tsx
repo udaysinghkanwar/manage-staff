@@ -41,10 +41,10 @@ export function Footer() {
               Coordinate casual workers through WhatsApp — from one clean dashboard.
             </p>
             <a
-              href="mailto:hello@managestaff.app"
+              href="mailto:hello@managestaff.ca"
               className="text-sm font-medium text-[#1aab52]"
             >
-              hello@managestaff.app
+              hello@managestaff.ca
             </a>
           </div>
 

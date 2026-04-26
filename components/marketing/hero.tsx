@@ -32,10 +32,10 @@ export function Hero() {
                 "h-12 gap-2 bg-[#25D366] hover:bg-[#1aab52] text-white border-transparent text-base sm:h-9 sm:text-sm",
               )}
             >
-              Get started free <ArrowRight className="h-4 w-4" />
+              Get early access <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              href="#how-it-works"
+              href="#contact"
               className={cn(
                 buttonVariants({ variant: "outline", size: "lg" }),
                 "h-12 text-base sm:h-9 sm:text-sm",
@@ -46,9 +46,9 @@ export function Hero() {
           </div>
 
           <p className="mt-4 text-sm text-muted-foreground">
-            No credit card required ·{" "}
+            Onboarding pilot teams now ·{" "}
             <span className="font-medium text-[#1aab52]">
-              Free 14-day trial
+              No credit card required
             </span>
           </p>
         </div>

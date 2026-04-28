@@ -238,67 +238,68 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
     })))
   }
 
-  // Realtime — wait for session, then listen to postgres_changes on messages table
+  // Realtime — listen for new rows in `messages`. Channel setup is synchronous
+  // so the cleanup always captures the reference, and the channel name uses a
+  // UUID to stay unique under React Strict Mode's double-invocation in dev.
   useEffect(() => {
     const supabase = createClient()
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    let channel: ReturnType<typeof supabase.channel> | null = null
 
-    supabase.auth.getSession().then(() => {
-      channel = supabase
-        .channel(`inbox-messages-${Date.now()}`)
-        .on(
-          'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'messages' },
-          (payload) => {
-            const row = payload.new as {
-              id: string
-              phone: string
-              worker_id: string | null
-              direction: 'inbound' | 'outbound'
-              body: string | null
-              is_availability_message: boolean
-              created_at: string
+    const channel = supabase
+      .channel(`inbox-messages-${crypto.randomUUID()}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages' },
+        (payload) => {
+          const row = payload.new as {
+            id: string
+            phone: string
+            worker_id: string | null
+            direction: 'inbound' | 'outbound'
+            body: string | null
+            is_availability_message: boolean
+            created_at: string
+          }
+
+          setConversations((prev) => {
+            const existing = prev.find((c) => c.phone === row.phone)
+
+            const newMsg: Message = {
+              id: row.id,
+              phone: row.phone,
+              worker_id: row.worker_id,
+              direction: row.direction,
+              body: row.body,
+              is_availability_message: row.is_availability_message,
+              created_at: row.created_at,
             }
 
-            setConversations((prev) => {
-              const existing = prev.find((c) => c.phone === row.phone)
-
-              const newMsg: Message = {
-                id: row.id,
-                phone: row.phone,
-                worker_id: row.worker_id,
-                direction: row.direction,
-                body: row.body,
-                is_availability_message: row.is_availability_message,
-                created_at: row.created_at,
+            if (existing) {
+              const filtered = existing.messages.filter(
+                (m) => !(m.id.startsWith('optimistic-') && m.body === row.body && m.direction === row.direction)
+              )
+              const updated: Conversation = {
+                ...existing,
+                messages: [...filtered, newMsg],
+                last_message: row.body,
+                last_at: row.created_at,
+                unread: existing.unread || (row.direction === 'inbound' && row.created_at > cutoff),
               }
+              const rest = prev.filter((c) => c.phone !== row.phone)
+              return [updated, ...rest]
+            }
 
-              if (existing) {
-                const filtered = existing.messages.filter(
-                  (m) => !(m.id.startsWith('optimistic-') && m.body === row.body && m.direction === row.direction)
-                )
-                const updated: Conversation = {
-                  ...existing,
-                  messages: [...filtered, newMsg],
-                  last_message: row.body,
-                  last_at: row.created_at,
-                  unread: existing.unread || (row.direction === 'inbound' && row.created_at > cutoff),
-                }
-                const rest = prev.filter((c) => c.phone !== row.phone)
-                return [updated, ...rest]
-              }
+            // New phone number — fall back to refetch to get worker name
+            refetch()
+            return prev
+          })
+        }
+      )
+      .subscribe()
 
-              // New phone number — fall back to refetch to get worker name
-              refetch()
-              return prev
-            })
-          }
-        )
-        .subscribe()
-    })
-
-    return () => { if (channel) supabase.removeChannel(channel) }
+    return () => {
+      supabase.removeChannel(channel)
+    }
   }, [refetch])
 
   if (conversations.length === 0) {

@@ -70,9 +70,11 @@ export async function POST(request: NextRequest) {
   const data = await res.json()
 
   if (!res.ok) {
-    console.error('[whatsapp/send] Meta API error:', data)
+    console.error('[whatsapp/send] Meta API error:', JSON.stringify(data, null, 2))
     return NextResponse.json({ success: false, error: data }, { status: res.status })
   }
+
+  console.log('[whatsapp/send] Meta accepted:', JSON.stringify({ to, type, response: data }, null, 2))
 
   const messageId = data.messages?.[0]?.id ?? null
   const messageBody = type === 'template'

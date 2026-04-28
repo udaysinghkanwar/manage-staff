@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getBaseUrl } from '@/lib/get-base-url'
 
 export interface Message {
   id: string
@@ -78,11 +79,7 @@ export async function getConversations(): Promise<Conversation[]> {
 }
 
 export async function sendReply(phone: string, body: string): Promise<{ error: string | null }> {
-  const baseUrl = process.env.NEXT_PUBLIC_DEV_BYPASS_AUTH === 'true'
-    ? 'http://localhost:3000'
-    : `https://${process.env.VERCEL_URL}`
-
-  const res = await fetch(`${baseUrl}/api/whatsapp/send`, {
+  const res = await fetch(`${getBaseUrl()}/api/whatsapp/send`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY! },
     body: JSON.stringify({ to: phone, type: 'text', text: body }),

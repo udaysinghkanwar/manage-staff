@@ -2,6 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
+import { getBaseUrl } from '@/lib/get-base-url'
 
 export interface BroadcastResult {
   sent: number
@@ -38,12 +39,6 @@ export async function broadcastJob(
 
   if (!workers?.length) return { sent: 0, failed: workerIds }
 
-  const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    ? process.env.VERCEL_URL
-      ? `https://${process.env.VERCEL_URL}`
-      : 'http://localhost:3000'
-    : 'http://localhost:3000'
-
   const result: BroadcastResult = { sent: 0, failed: [] }
 
   type JobCompany = { name: string; street_address: string; city: string; province: string }
@@ -64,7 +59,7 @@ export async function broadcastJob(
 
   for (const worker of workers) {
     try {
-      const res = await fetch(`${baseUrl}/api/whatsapp/send`, {
+      const res = await fetch(`${getBaseUrl()}/api/whatsapp/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY! },
         body: JSON.stringify({

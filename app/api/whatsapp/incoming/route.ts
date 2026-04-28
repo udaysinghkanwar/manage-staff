@@ -2,6 +2,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { isAvailabilityMessage } from '@/lib/whatsapp/keyword-filter'
+import { getBaseUrl } from '@/lib/get-base-url'
 import { parseAvailabilityMessage } from '@/lib/whatsapp/claude-parser'
 import { upsertWorker } from '@/lib/whatsapp/upsert-worker'
 import { logMessage } from '@/lib/whatsapp/log-message'
@@ -86,6 +87,20 @@ export async function POST(request: NextRequest) {
         const body  = msg.text?.body ?? ''
         await processMessage(phone, body)
       }
+
+      // Delivery / read / failed status updates for outbound messages
+      const statuses = change.value?.statuses ?? []
+      for (const s of statuses) {
+        if (s.status === 'failed') {
+          console.error('[webhook/status] FAILED:', JSON.stringify({
+            wamid: s.id,
+            recipient: s.recipient_id,
+            errors: s.errors,
+          }, null, 2))
+        } else {
+          console.log('[webhook/status]', s.status, '→', s.recipient_id, '(' + s.id + ')')
+        }
+      }
     }
   }
 
@@ -138,12 +153,6 @@ async function processMessage(phone: string, body: string) {
   }
 
   await logMessage(phone, body, 'inbound', isAvailability, workerId ?? undefined)
-}
-
-function getBaseUrl() {
-  return process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : 'http://localhost:3000'
 }
 
 async function sendOnboarding(phone: string) {
@@ -221,6 +230,18 @@ interface MetaWebhookPayload {
           type: string
           from: string
           text?: { body: string }
+        }>
+        statuses?: Array<{
+          id: string                    // wamid
+          recipient_id: string          // phone number
+          status: 'sent' | 'delivered' | 'read' | 'failed'
+          timestamp?: string
+          errors?: Array<{
+            code: number
+            title: string
+            message?: string
+            error_data?: { details?: string }
+          }>
         }>
       }
     }>

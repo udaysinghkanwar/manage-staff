@@ -126,33 +126,30 @@ async function processMessage(phone: string, body: string) {
     .eq('phone', phone)
     .maybeSingle()
 
+  const isAvailability = isAvailabilityMessage(body)
+
   if (!worker) {
-    const isAvailability = isAvailabilityMessage(body)
     if (isAvailability) {
-      // They sent their details directly — register and confirm, skip onboarding
       const parsed = await parseAvailabilityMessage(phone, body)
       const workerId = await upsertWorker(phone, parsed)
-      await sendConfirmation(phone)
       await logMessage(phone, body, 'inbound', true, workerId ?? undefined)
+      await sendConfirmation(phone)
     } else {
-      // Unknown number, no details yet — send onboarding
-      await sendOnboarding(phone)
       await logMessage(phone, body, 'inbound', false)
+      await sendOnboarding(phone)
     }
     return
   }
 
-  // Known worker — existing availability pipeline
-  const isAvailability = isAvailabilityMessage(body)
   let workerId: string | null = null
-
   if (isAvailability) {
     const parsed = await parseAvailabilityMessage(phone, body)
     workerId = await upsertWorker(phone, parsed)
+  }
+  await logMessage(phone, body, 'inbound', isAvailability, workerId ?? undefined)
+  if (isAvailability) {
     await sendConfirmation(phone)
   }
-
-  await logMessage(phone, body, 'inbound', isAvailability, workerId ?? undefined)
 }
 
 async function sendOnboarding(phone: string) {

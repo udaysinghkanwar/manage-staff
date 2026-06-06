@@ -2,7 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { revalidatePath } from 'next/cache'
-import { getBaseUrl } from '@/lib/get-base-url'
+import { sendWhatsAppMessage } from '@/lib/whatsapp/send'
 
 export interface BroadcastResult {
   sent: number
@@ -59,29 +59,23 @@ export async function broadcastJob(
 
   for (const worker of workers) {
     try {
-      const res = await fetch(`${getBaseUrl()}/api/whatsapp/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY! },
-        body: JSON.stringify({
-          to: worker.phone,
-          type: 'template',
-          templateName: 'job_broadcast',
-          templateParams: [
-            worker.name,
-            job.title,
-            jobDate,
-            companyName,
-            companyAddress,
-            job.shift ?? 'TBD',
-            job.safety_shoes_required ? 'Yes' : 'No',
-            job.description ?? 'N/A',
-          ],
-        }),
+      const send = await sendWhatsAppMessage({
+        to: worker.phone,
+        type: 'template',
+        templateName: 'job_broadcast',
+        templateParams: [
+          worker.name,
+          job.title,
+          jobDate,
+          companyName,
+          companyAddress,
+          job.shift ?? 'TBD',
+          job.safety_shoes_required ? 'Yes' : 'No',
+          job.description ?? 'N/A',
+        ],
       })
 
-      const data = await res.json()
-
-      if (data.success) {
+      if (send.success) {
         const { error: insertError } = await supabase
           .from('job_broadcasts')
           .insert({ job_id: jobId, worker_id: worker.id, response: 'pending' })

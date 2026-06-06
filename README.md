@@ -4,9 +4,15 @@ An internal dashboard for a staffing agency to manage workers, post jobs, match 
 
 ## What it does
 
-- **Workers**: Add and manage workers with shift preferences, availability, and location. Workers can also text in their availability via WhatsApp and be auto-added.
-- **Jobs**: Create job postings, auto-match workers by shift/location/availability, broadcast job offers via WhatsApp, track YES/NO responses, and assign workers.
-- **Inbox**: Full WhatsApp conversation log with reply capability.
+- **Workers**: Add and manage workers with shift preferences, availability, and location. Workers can also text in their availability via WhatsApp and be auto-registered after a guided onboarding reply.
+- **Companies**: Track client companies with structured addresses, used as the location for jobs.
+- **Jobs**: Create job postings (one-off or full-time/ongoing), auto-match workers by shift/location/availability, broadcast job offers via WhatsApp template messages, track YES/NO replies, and assign workers.
+- **Inbox**: Realtime WhatsApp conversation log with reply capability and optimistic sending.
+- **Landing page + waitlist**: Public marketing page with email capture that writes to a `waitlist` table.
+
+## Tech stack
+
+Next.js 16 (App Router) · React 19 · Supabase (Postgres + Auth + Realtime) · Tailwind v4 · shadcn/ui (base-nova) · Anthropic SDK · Meta WhatsApp Cloud API · Vercel.
 
 ## Running locally
 
@@ -25,7 +31,7 @@ Fill in the values (see Environment Variables below).
 
 **3. Run the database schema**
 
-Go to [Supabase SQL Editor](https://supabase.com/dashboard/project/_/sql) and run the contents of `supabase/schema.sql`. Then run any pending migrations:
+Go to [Supabase SQL Editor](https://supabase.com/dashboard/project/_/sql) and run the contents of `supabase/schema.sql`. Then apply migrations:
 ```bash
 npm run db:push
 ```
@@ -47,12 +53,22 @@ Open [http://localhost:3000](http://localhost:3000).
 | `SUPABASE_DB_URL` | Supabase → Settings → Database → Connection string (Transaction mode) |
 | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) |
 | `META_WEBHOOK_VERIFY_TOKEN` | Any string you choose — enter the same value in Meta's webhook config |
-| `META_WEBHOOK_SECRET` | Meta Developer Console → WhatsApp → Configuration → App Secret |
+| `META_WEBHOOK_SECRET` | Meta Developer Console → App Settings → Basic → App Secret |
 | `META_PHONE_NUMBER_ID` | Meta Developer Console → WhatsApp → API Setup → Phone Number ID |
 | `META_ACCESS_TOKEN` | Meta Developer Console → WhatsApp → API Setup → Access Token |
-| `NEXT_PUBLIC_DEV_BYPASS_AUTH` | Set to `true` locally to skip auth. Always `false` in production. |
+| `NEXT_PUBLIC_DEV_BYPASS_AUTH` | Set to `true` locally to show a dev "skip login" button. Always `false` in production. |
+
+`VERCEL_URL` is auto-injected by Vercel — do not set it manually. It's used by internal server-to-server calls (e.g. broadcast → `/api/whatsapp/send`) via [lib/get-base-url.ts](lib/get-base-url.ts).
+
+## Authentication
+
+Email + password only. **Public sign-ups are disabled** — accounts are created manually in Supabase Studio (Authentication → Users → Add user). Each company employee gets their own login.
+
+`getUser()` is used for all authorization checks; session refresh runs on every request via [proxy.ts](proxy.ts).
 
 ## Database migrations
+
+Migrations live in [supabase/migrations/](supabase/migrations/) and are applied with the Supabase CLI.
 
 ```bash
 # Push pending migrations to remote database
@@ -93,9 +109,19 @@ Set the resulting URL as your webhook in Meta Developer Console:
 2. Create an app → Add WhatsApp product
 3. Register a phone number (must not already be on WhatsApp)
 4. Fill in `META_PHONE_NUMBER_ID` and `META_ACCESS_TOKEN`
-5. Create a message template named `job_broadcast` with 6 body parameters
+5. Create an approved message template named `job_broadcast` with **8 body parameters** in this order:
+   1. Worker name
+   2. Job title
+   3. Job date (or "Full-time / Ongoing")
+   4. Company name
+   5. Company address
+   6. Shift
+   7. Safety shoes required (Yes/No)
+   8. Description
 6. Configure webhook URL: `https://your-app/api/whatsapp/incoming`
-7. Set `META_WEBHOOK_VERIFY_TOKEN` and `META_WEBHOOK_SECRET`
+7. Set `META_WEBHOOK_VERIFY_TOKEN` and `META_WEBHOOK_SECRET` (App Secret) in your env
+
+Free-form replies (inbox, confirmations, onboarding) are sent as plain text and only work inside Meta's 24-hour customer service window — outside that window only approved templates can be sent.
 
 See [Meta WhatsApp Cloud API docs](https://developers.facebook.com/docs/whatsapp/cloud-api) for full details.
 
@@ -105,4 +131,4 @@ See [Meta WhatsApp Cloud API docs](https://developers.facebook.com/docs/whatsapp
 2. Connect repo in [Vercel](https://vercel.com) — auto-deploys on every push to `main`
 3. Add all environment variables in Vercel → Project → Settings → Environment Variables
 4. Set `NEXT_PUBLIC_DEV_BYPASS_AUTH=false` in production
-5. Add Vercel URL to Supabase → Authentication → Redirect URLs: `https://your-app.vercel.app/auth/callback`
+5. After the first deploy, update Meta's webhook callback URL to `https://<your-domain>/api/whatsapp/incoming`

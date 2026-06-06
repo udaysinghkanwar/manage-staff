@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from 'crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { isAvailabilityMessage } from '@/lib/whatsapp/keyword-filter'
-import { getBaseUrl } from '@/lib/get-base-url'
+import { sendWhatsAppMessage } from '@/lib/whatsapp/send'
 import { parseAvailabilityMessage } from '@/lib/whatsapp/claude-parser'
 import { upsertWorker } from '@/lib/whatsapp/upsert-worker'
 import { logMessage } from '@/lib/whatsapp/log-message'
@@ -157,14 +157,10 @@ async function processMessage(phone: string, body: string) {
 
 async function sendOnboarding(phone: string) {
   try {
-    await fetch(`${getBaseUrl()}/api/whatsapp/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY! },
-      body: JSON.stringify({
-        to: phone,
-        type: 'text',
-        text: 'Hi! Thanks for reaching out.\n\nTo register as a worker, please reply with your details:\n\nName: [full name]\nLocation: [city, province]\nShift: [day / afternoon / night]\nAvailability: [full-time / part-time]\nDays: [Mon Tue Wed...] (if part-time)\nGender: [male / female]\n\nExample:\nName: John Smith\nLocation: Toronto, ON\nShift: Day\nAvailability: Full-time\nGender: Male',
-      }),
+    await sendWhatsAppMessage({
+      to: phone,
+      type: 'text',
+      text: 'Hi! Thanks for reaching out.\n\nTo register as a worker, please reply with your details:\n\nName: [full name]\nLocation: [city, province]\nShift: [day / afternoon / night]\nAvailability: [full-time / part-time]\nDays: [Mon Tue Wed...] (if part-time)\nGender: [male / female]\n\nExample:\nName: John Smith\nLocation: Toronto, ON\nShift: Day\nAvailability: Full-time\nGender: Male',
     })
   } catch (err) {
     console.error('[onboarding] failed to send to', phone, err)
@@ -173,14 +169,10 @@ async function sendOnboarding(phone: string) {
 
 async function sendConfirmation(phone: string) {
   try {
-    await fetch(`${getBaseUrl()}/api/whatsapp/send`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-secret': process.env.SUPABASE_SERVICE_ROLE_KEY! },
-      body: JSON.stringify({
-        to: phone,
-        type: 'text',
-        text: 'Your information has been received and processed. To make changes, simply resend your updated details.',
-      }),
+    await sendWhatsAppMessage({
+      to: phone,
+      type: 'text',
+      text: 'Your information has been received and processed. To make changes, simply resend your updated details.',
     })
   } catch (err) {
     console.error('[confirmation] failed to send to', phone, err)

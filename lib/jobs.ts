@@ -201,7 +201,7 @@ export async function getMatchedWorkers(
 
     // Matching criteria
     const shiftMatch = !resolvedJob.shift || !w.shift || w.shift === resolvedJob.shift
-    const cityMatch = !!companyCity && !!w.address && w.address.toLowerCase().includes(companyCity)
+    const cityMatch = !!companyCity && !!w.city && w.city.toLowerCase().includes(companyCity)
     const daysMatch = w.availability_type === 'full-time' ||
       !jobDayOfWeek ||
       !w.available_days?.length ||

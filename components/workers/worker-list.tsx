@@ -55,8 +55,8 @@ export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
   const locations = useMemo(() => {
     const cities = new Set<string>()
     for (const w of workers) {
-      if (w.address) {
-        const city = w.address.split(',')[0].trim()
+      if (w.city) {
+        const city = w.city.split(',')[0].trim()
         if (city) cities.add(city)
       }
     }
@@ -73,7 +73,7 @@ export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
     if (avail !== 'all' && w.availability_type !== avail) return false
     if (assign === 'available' && w.is_assigned) return false
     if (assign === 'assigned' && !w.is_assigned) return false
-    if (location !== 'all' && !w.address?.toLowerCase().includes(location.toLowerCase())) return false
+    if (location !== 'all' && !w.city?.toLowerCase().includes(location.toLowerCase())) return false
     return true
   })
 

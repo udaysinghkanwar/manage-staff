@@ -15,7 +15,8 @@ export interface Worker {
   id: string
   name: string
   phone: string
-  address: string | null
+  city: string | null
+  age: number | null
   gender: WorkerGender | null
   shift: ShiftType | null
   availability_type: AvailabilityType | null

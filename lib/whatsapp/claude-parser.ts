@@ -3,7 +3,8 @@ import type { DayOfWeek, ShiftType, AvailabilityType, WorkerGender } from '@/lib
 
 export interface ParsedWorkerData {
   name: string | null
-  address: string | null
+  city: string | null
+  age: number | null
   gender: WorkerGender | null
   shift: ShiftType | null
   availability_type: AvailabilityType | null
@@ -13,7 +14,8 @@ export interface ParsedWorkerData {
 
 const EMPTY: ParsedWorkerData = {
   name: null,
-  address: null,
+  city: null,
+  age: null,
   gender: null,
   shift: null,
   availability_type: null,
@@ -21,18 +23,33 @@ const EMPTY: ParsedWorkerData = {
   notes: null,
 }
 
-const SYSTEM_PROMPT = `You are a parser for a staffing agency. Extract worker information from WhatsApp messages.
+const SYSTEM_PROMPT = `You are a parser for a staffing agency in Ontario, Canada. Extract worker information from WhatsApp messages.
 Return ONLY a JSON object with these fields (use null for anything not mentioned):
 {
   "name": string | null,
-  "address": string | null,
+  "city": string | null,
+  "age": integer | null,
   "gender": "male" | "female" | null,
   "shift": "day" | "afternoon" | "night" | null,
   "availability_type": "full-time" | "part-time" | null,
   "available_days": string[] | null,
   "notes": string | null
 }
-For available_days, values must be from: mon, tue, wed, thu, fri, sat, sun.
+
+city rules:
+- Always return the city in the format "City, XX" where XX is the 2-letter province code (e.g. "Toronto, ON", "Mississauga, ON", "Montreal, QC").
+- The city name must be Title Case ("Toronto", not "toronto" or "TORONTO").
+- If the sender provides a full street address (e.g. "123 Main St, Scarborough, Toronto, ON M1B 2K3"), extract only the city and province — never include the street, unit, or postal code.
+- If only a neighbourhood is given (e.g. "Scarborough", "North York", "Etobicoke"), return the parent city it belongs to ("Toronto, ON" for those examples).
+- If only a city is given without a province, assume "ON" (this is an Ontario-based agency).
+- If no location is mentioned at all, return null.
+
+age rules:
+- Return an integer between 18 and 119, or null if not mentioned or out of range.
+
+available_days rules:
+- Values must be from: mon, tue, wed, thu, fri, sat, sun.
+
 Do not include any explanation. Return only the JSON object.`
 
 const client = new Anthropic()
@@ -61,9 +78,14 @@ export async function parseAvailabilityMessage(
     const json = text.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
     const parsed = JSON.parse(json)
 
+    const ageNum = typeof parsed.age === 'number' && Number.isInteger(parsed.age) && parsed.age >= 18 && parsed.age < 120
+      ? parsed.age
+      : null
+
     const result: ParsedWorkerData = {
       name: parsed.name ?? null,
-      address: parsed.address ?? null,
+      city: typeof parsed.city === 'string' ? parsed.city.trim() || null : null,
+      age: ageNum,
       gender: parsed.gender ?? null,
       shift: parsed.shift ?? null,
       availability_type: parsed.availability_type ?? null,

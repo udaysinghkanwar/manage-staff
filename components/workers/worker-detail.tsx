@@ -53,7 +53,8 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
   // Edit state mirrors worker fields
   const [name, setName] = useState(worker.name);
   const [phone, setPhone] = useState(worker.phone);
-  const [address, setAddress] = useState(worker.address ?? "");
+  const [city, setCity] = useState(worker.city ?? "");
+  const [age, setAge] = useState<string>(worker.age != null ? String(worker.age) : "");
   const [gender, setGender] = useState<WorkerGender | "">(worker.gender ?? "");
   const [shift, setShift] = useState<ShiftType | "">(worker.shift ?? "");
   const [availType, setAvailType] = useState<AvailabilityType | "">(
@@ -67,7 +68,8 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
   function cancelEdit() {
     setName(worker.name);
     setPhone(worker.phone);
-    setAddress(worker.address ?? "");
+    setCity(worker.city ?? "");
+    setAge(worker.age != null ? String(worker.age) : "");
     setGender(worker.gender ?? "");
     setShift(worker.shift ?? "");
     setAvailType(worker.availability_type ?? "");
@@ -96,12 +98,22 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
       setError("Select at least one available day.");
       return;
     }
+    let ageValue: number | null = null;
+    if (age.trim()) {
+      const n = Number(age);
+      if (!Number.isInteger(n) || n < 18 || n >= 120) {
+        setError("Workers must be at least 18 years old.");
+        return;
+      }
+      ageValue = n;
+    }
     setError(null);
     startTransition(async () => {
       const result = await updateWorker(worker.id, {
         name: name.trim(),
         phone: phone.trim(),
-        address: address || undefined,
+        city: city || undefined,
+        age: ageValue,
         gender: gender || undefined,
         shift: shift || undefined,
         availability_type: availType || undefined,
@@ -237,7 +249,28 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
             </div>
             <div className="space-y-1.5">
               <Label>City</Label>
-              <CityPicker value={address} onChange={setAddress} />
+              <CityPicker value={city} onChange={setCity} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Age</Label>
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={18}
+                max={119}
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+                className={`min-h-[44px] ${
+                  age.trim() !== "" && Number(age) > 0 && Number(age) < 18
+                    ? "ring-2 ring-destructive"
+                    : ""
+                }`}
+              />
+              {age.trim() !== "" && Number(age) > 0 && Number(age) < 18 && (
+                <p className="text-xs text-destructive">
+                  Workers must be at least 18 years old.
+                </p>
+              )}
             </div>
             <fieldset className="space-y-1.5">
               <legend className="text-sm font-medium">Gender</legend>
@@ -343,6 +376,10 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
         ) : (
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
             <div>
+              <dt className="text-muted-foreground">Age</dt>
+              <dd className="font-medium">{worker.age ?? "—"}</dd>
+            </div>
+            <div>
               <dt className="text-muted-foreground">Gender</dt>
               <dd className="font-medium capitalize">{worker.gender ?? "—"}</dd>
             </div>
@@ -368,7 +405,7 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
             )}
             <div className="col-span-2">
               <dt className="text-muted-foreground">City</dt>
-              <dd className="font-medium">{worker.address ?? "—"}</dd>
+              <dd className="font-medium">{worker.city ?? "—"}</dd>
             </div>
             {worker.notes && (
               <div className="col-span-2">

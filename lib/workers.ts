@@ -20,7 +20,8 @@ export interface WorkerWithAssignment extends Worker {
 export interface CreateWorkerData {
   name: string
   phone: string
-  address?: string
+  city?: string
+  age?: number | null
   gender?: WorkerGender
   shift?: ShiftType
   availability_type?: AvailabilityType
@@ -129,7 +130,8 @@ export async function createWorker(data: CreateWorkerData) {
   const { error } = await supabase.from('workers').insert({
     name: data.name.trim(),
     phone: data.phone.trim(),
-    address: data.address?.trim() || null,
+    city: data.city?.trim() || null,
+    age: data.age ?? null,
     gender: data.gender ?? null,
     shift: data.shift ?? null,
     availability_type: data.availability_type ?? null,
@@ -158,7 +160,8 @@ export async function updateWorker(id: string, data: UpdateWorkerData) {
     .update({
       ...(data.name !== undefined && { name: data.name.trim() }),
       ...(data.phone !== undefined && { phone: data.phone.trim() }),
-      ...(data.address !== undefined && { address: data.address?.trim() || null }),
+      ...(data.city !== undefined && { city: data.city?.trim() || null }),
+      ...(data.age !== undefined && { age: data.age }),
       ...(data.gender !== undefined && { gender: data.gender }),
       ...(data.shift !== undefined && { shift: data.shift }),
       ...(data.availability_type !== undefined && { availability_type: data.availability_type }),

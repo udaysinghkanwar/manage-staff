@@ -18,7 +18,8 @@ type FormState = { error: string | null; field?: string } | null
 async function submitWorker(_prev: FormState, formData: FormData): Promise<FormState> {
   const name = formData.get('name') as string
   const phone = formData.get('phone') as string
-  const address = formData.get('address') as string
+  const city = formData.get('city') as string
+  const ageRaw = (formData.get('age') as string | null)?.trim() ?? ''
   const gender = formData.get('gender') as WorkerGender | null
   const shift = formData.get('shift') as ShiftType | null
   const availability_type = formData.get('availability_type') as AvailabilityType | null
@@ -31,12 +32,21 @@ async function submitWorker(_prev: FormState, formData: FormData): Promise<FormS
   if (!phoneClean) return { error: 'Phone number is required.' }
   if (!/^\+?[\d\s\-().]{7,}$/.test(phoneClean)) return { error: 'Enter a valid phone number.' }
 
+  let age: number | null = null
+  if (ageRaw) {
+    const n = Number(ageRaw)
+    if (!Number.isInteger(n) || n < 18 || n >= 120) {
+      return { error: 'Workers must be at least 18 years old.', field: 'age' }
+    }
+    age = n
+  }
+
   if (availability_type === 'part-time' && available_days.length === 0) {
     return { error: 'Select at least one available day for part-time workers.' }
   }
 
   const result = await createWorker({
-    name, phone: phoneClean, address, notes,
+    name, phone: phoneClean, city, notes, age,
     gender: gender || undefined,
     shift: shift || undefined,
     availability_type: availability_type || undefined,
@@ -55,6 +65,10 @@ export function NewWorkerForm() {
   const [availType, setAvailType] = useState<string>('')
   const [phoneRaw, setPhoneRaw] = useState('')
   const [city, setCity] = useState('')
+  const [ageInput, setAgeInput] = useState('')
+
+  const ageBelowMin =
+    ageInput.trim() !== '' && Number(ageInput) > 0 && Number(ageInput) < 18
 
   useEffect(() => {
     if (state?.field === 'phone') setPhoneRaw('')
@@ -95,9 +109,31 @@ export function NewWorkerForm() {
 
       {/* City */}
       <div className="space-y-1.5">
-        <Label htmlFor="address">City</Label>
-        <input type="hidden" name="address" value={city} />
-        <CityPicker id="address" value={city} onChange={setCity} />
+        <Label htmlFor="city">City</Label>
+        <input type="hidden" name="city" value={city} />
+        <CityPicker id="city" value={city} onChange={setCity} />
+      </div>
+
+      {/* Age */}
+      <div className="space-y-1.5">
+        <Label htmlFor="age">Age</Label>
+        <Input
+          id="age"
+          name="age"
+          type="number"
+          inputMode="numeric"
+          min={18}
+          max={119}
+          placeholder="e.g. 32"
+          value={ageInput}
+          onChange={(e) => setAgeInput(e.target.value)}
+          className={`min-h-[44px] ${fieldError('age') || ageBelowMin ? 'ring-2 ring-destructive' : ''}`}
+        />
+        {ageBelowMin ? (
+          <p className="text-xs text-destructive">Workers must be at least 18 years old.</p>
+        ) : fieldError('age') ? (
+          <p className="text-xs text-destructive">{fieldError('age')}</p>
+        ) : null}
       </div>
 
       {/* Gender */}

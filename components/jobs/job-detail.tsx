@@ -565,9 +565,9 @@ function MatchedWorkers({
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {formatPhone(w.phone)}
                   </p>
-                  {w.address && (
+                  {w.city && (
                     <p className="text-xs text-muted-foreground truncate">
-                      {w.address}
+                      {w.city}
                     </p>
                   )}
                   {w.availability_type === "part-time" &&

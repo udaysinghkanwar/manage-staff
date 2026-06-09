@@ -19,9 +19,10 @@ async function submitWorker(_prev: FormState, formData: FormData): Promise<FormS
   const name = formData.get('name') as string
   const phone = formData.get('phone') as string
   const city = formData.get('city') as string
+  const main_intersection = (formData.get('main_intersection') as string | null) ?? ''
   const ageRaw = (formData.get('age') as string | null)?.trim() ?? ''
   const gender = formData.get('gender') as WorkerGender | null
-  const shift = formData.get('shift') as ShiftType | null
+  const shifts = formData.getAll('shifts') as ShiftType[]
   const availability_type = formData.get('availability_type') as AvailabilityType | null
   const available_days = formData.getAll('available_days') as DayOfWeek[]
   const notes = formData.get('notes') as string
@@ -47,8 +48,9 @@ async function submitWorker(_prev: FormState, formData: FormData): Promise<FormS
 
   const result = await createWorker({
     name, phone: phoneClean, city, notes, age,
+    main_intersection: main_intersection.trim() || undefined,
     gender: gender || undefined,
-    shift: shift || undefined,
+    shifts: shifts.length > 0 ? shifts : undefined,
     availability_type: availability_type || undefined,
     available_days: availability_type === 'part-time' ? available_days : undefined,
   })
@@ -114,6 +116,17 @@ export function NewWorkerForm() {
         <CityPicker id="city" value={city} onChange={setCity} />
       </div>
 
+      {/* Main intersection */}
+      <div className="space-y-1.5">
+        <Label htmlFor="main_intersection">Main intersection</Label>
+        <Input
+          id="main_intersection"
+          name="main_intersection"
+          placeholder="e.g. Bramalea and Queen St"
+          className="min-h-[44px]"
+        />
+      </div>
+
       {/* Age */}
       <div className="space-y-1.5">
         <Label htmlFor="age">Age</Label>
@@ -149,13 +162,14 @@ export function NewWorkerForm() {
         </div>
       </fieldset>
 
-      {/* Shift */}
+      {/* Shifts — multi-select */}
       <fieldset className="space-y-1.5">
         <legend className="text-sm font-medium">Shift preference</legend>
-        <div className="flex gap-4">
+        <p className="text-xs text-muted-foreground">Select all that apply.</p>
+        <div className="flex gap-4 flex-wrap">
           {(['day', 'afternoon', 'night'] as ShiftType[]).map((s) => (
             <label key={s} className="flex items-center gap-2 cursor-pointer min-h-[44px]">
-              <input type="radio" name="shift" value={s} className="w-4 h-4" />
+              <input type="checkbox" name="shifts" value={s} className="w-4 h-4" />
               <span className="capitalize">{s}</span>
             </label>
           ))}

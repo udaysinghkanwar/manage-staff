@@ -200,7 +200,7 @@ export async function getMatchedWorkers(
     if (isAssigned) continue
 
     // Matching criteria
-    const shiftMatch = !resolvedJob.shift || !w.shift || w.shift === resolvedJob.shift
+    const shiftMatch = !resolvedJob.shift || !w.shifts?.length || w.shifts.includes(resolvedJob.shift)
     const cityMatch = !!companyCity && !!w.city && w.city.toLowerCase().includes(companyCity)
     const daysMatch = w.availability_type === 'full-time' ||
       !jobDayOfWeek ||
@@ -350,5 +350,5 @@ export async function getAvailableWorkers() {
       (a: { assigned_date: string; jobs: { status: string } | null }) =>
         a.assigned_date === today && a.jobs?.status !== 'cancelled'
     )
-  ).map((w) => ({ id: w.id, name: w.name, phone: w.phone, shift: w.shift }))
+  ).map((w) => ({ id: w.id, name: w.name, phone: w.phone, shifts: w.shifts }))
 }

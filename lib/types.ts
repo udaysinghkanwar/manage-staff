@@ -16,9 +16,10 @@ export interface Worker {
   name: string
   phone: string
   city: string | null
+  main_intersection: string | null
   age: number | null
   gender: WorkerGender | null
-  shift: ShiftType | null
+  shifts: ShiftType[] | null
   availability_type: AvailabilityType | null
   available_days: DayOfWeek[] | null
   status: WorkerStatus

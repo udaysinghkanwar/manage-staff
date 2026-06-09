@@ -182,7 +182,7 @@ async function sendOnboarding(phone: string) {
     await sendWhatsAppMessage({
       to: phone,
       type: "text",
-      text: "Hi! Thanks for reaching out.\n\nTo register as a worker, please reply with your details:\n\nName: [full name]\nAge: [your age]\nCity: [city, province]\nShift: [day / afternoon / night]\nAvailability: [full-time / part-time]\nDays: [Mon Tue Wed...] (if part-time)\nGender: [male / female]\n\nExample:\nName: John Smith\nAge: 32\nCity: Toronto, ON\nShift: Day\nAvailability: Full-time\nGender: Male",
+      text: "Hi! Thanks for reaching out.\n\nTo register as a worker, please reply with your details:\n\nName: [full name]\nAge: [your age]\nCity: [city, province]\nMain intersection: [nearest major intersection]\nShifts: [day / afternoon / night — list all you're available for]\nAvailability: [full-time / part-time]\nDays: [Mon Tue Wed...] (if part-time)\nGender: [male / female]\n\nExample:\nName: John Smith\nAge: 32\nCity: Brampton, ON\nMain intersection: Bramalea and Queen St\nShifts: Day, Afternoon\nAvailability: Full-time\nGender: Male",
     });
   } catch (err) {
     console.error("[onboarding] failed to send to", phone, err);

@@ -54,9 +54,12 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
   const [name, setName] = useState(worker.name);
   const [phone, setPhone] = useState(worker.phone);
   const [city, setCity] = useState(worker.city ?? "");
+  const [mainIntersection, setMainIntersection] = useState(
+    worker.main_intersection ?? "",
+  );
   const [age, setAge] = useState<string>(worker.age != null ? String(worker.age) : "");
   const [gender, setGender] = useState<WorkerGender | "">(worker.gender ?? "");
-  const [shift, setShift] = useState<ShiftType | "">(worker.shift ?? "");
+  const [shifts, setShifts] = useState<ShiftType[]>(worker.shifts ?? []);
   const [availType, setAvailType] = useState<AvailabilityType | "">(
     worker.availability_type ?? "",
   );
@@ -69,9 +72,10 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
     setName(worker.name);
     setPhone(worker.phone);
     setCity(worker.city ?? "");
+    setMainIntersection(worker.main_intersection ?? "");
     setAge(worker.age != null ? String(worker.age) : "");
     setGender(worker.gender ?? "");
-    setShift(worker.shift ?? "");
+    setShifts(worker.shifts ?? []);
     setAvailType(worker.availability_type ?? "");
     setAvailDays(worker.available_days ?? []);
     setNotes(worker.notes ?? "");
@@ -113,9 +117,10 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
         name: name.trim(),
         phone: phone.trim(),
         city: city || undefined,
+        main_intersection: mainIntersection.trim() || undefined,
         age: ageValue,
         gender: gender || undefined,
-        shift: shift || undefined,
+        shifts,
         availability_type: availType || undefined,
         available_days: availType === "part-time" ? availDays : [],
         notes: notes || undefined,
@@ -156,8 +161,16 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
     });
   }
 
-  // Find active assignment from assignments list
-  const activeAssignment = assignments.find((a) => a.job.status === "open");
+  // Find an assignment that's active for *today* — same rule used by getWorkers().
+  // Full-time/permanent (assigned_date === null) or scheduled for today, and not cancelled.
+  const today = new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/New_York",
+  });
+  const activeAssignment = assignments.find(
+    (a) =>
+      a.job.status !== "cancelled" &&
+      (a.assigned_date === null || a.assigned_date === today),
+  );
 
   return (
     <div className="space-y-6">
@@ -252,6 +265,15 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
               <CityPicker value={city} onChange={setCity} />
             </div>
             <div className="space-y-1.5">
+              <Label>Main intersection</Label>
+              <Input
+                value={mainIntersection}
+                onChange={(e) => setMainIntersection(e.target.value)}
+                placeholder="e.g. Bramalea and Queen St"
+                className="min-h-[44px]"
+              />
+            </div>
+            <div className="space-y-1.5">
               <Label>Age</Label>
               <Input
                 type="number"
@@ -292,17 +314,26 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
               </div>
             </fieldset>
             <fieldset className="space-y-1.5">
-              <legend className="text-sm font-medium">Shift</legend>
-              <div className="flex gap-4">
+              <legend className="text-sm font-medium">Shifts</legend>
+              <p className="text-xs text-muted-foreground">
+                Select all that apply.
+              </p>
+              <div className="flex gap-4 flex-wrap">
                 {(["day", "afternoon", "night"] as ShiftType[]).map((s) => (
                   <label
                     key={s}
                     className="flex items-center gap-2 cursor-pointer min-h-[44px]"
                   >
                     <input
-                      type="radio"
-                      checked={shift === s}
-                      onChange={() => setShift(s)}
+                      type="checkbox"
+                      checked={shifts.includes(s)}
+                      onChange={() =>
+                        setShifts((prev) =>
+                          prev.includes(s)
+                            ? prev.filter((x) => x !== s)
+                            : [...prev, s],
+                        )
+                      }
                       className="w-4 h-4"
                     />
                     <span className="capitalize">{s}</span>
@@ -384,8 +415,10 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
               <dd className="font-medium capitalize">{worker.gender ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Shift</dt>
-              <dd className="font-medium capitalize">{worker.shift ?? "—"}</dd>
+              <dt className="text-muted-foreground">Shifts</dt>
+              <dd className="font-medium capitalize">
+                {worker.shifts?.length ? worker.shifts.join(", ") : "—"}
+              </dd>
             </div>
             <div>
               <dt className="text-muted-foreground">Availability</dt>
@@ -406,6 +439,10 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
             <div className="col-span-2">
               <dt className="text-muted-foreground">City</dt>
               <dd className="font-medium">{worker.city ?? "—"}</dd>
+            </div>
+            <div className="col-span-2">
+              <dt className="text-muted-foreground">Main intersection</dt>
+              <dd className="font-medium">{worker.main_intersection ?? "—"}</dd>
             </div>
             {worker.notes && (
               <div className="col-span-2">

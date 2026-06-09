@@ -21,9 +21,10 @@ export interface CreateWorkerData {
   name: string
   phone: string
   city?: string
+  main_intersection?: string
   age?: number | null
   gender?: WorkerGender
-  shift?: ShiftType
+  shifts?: ShiftType[]
   availability_type?: AvailabilityType
   available_days?: DayOfWeek[]
   notes?: string
@@ -38,6 +39,7 @@ export interface WorkerHistory {
   assignments: Array<{
     id: string
     assigned_at: string
+    assigned_date: string | null
     job: { id: string; title: string; location: string; shift: string | null; status: string }
   }>
   broadcasts: Array<{
@@ -97,7 +99,7 @@ export async function getWorker(id: string): Promise<WorkerHistory> {
 
   const { data: assignments } = await supabase
     .from('job_assignments')
-    .select('id, assigned_at, job_id, jobs ( id, title, location, shift, status )')
+    .select('id, assigned_at, assigned_date, job_id, jobs ( id, title, location, shift, status )')
     .eq('worker_id', id)
     .order('assigned_at', { ascending: false })
 
@@ -112,6 +114,7 @@ export async function getWorker(id: string): Promise<WorkerHistory> {
     assignments: (assignments ?? []).map((a) => ({
       id: a.id,
       assigned_at: a.assigned_at,
+      assigned_date: a.assigned_date,
       job: (Array.isArray(a.jobs) ? a.jobs[0] : a.jobs) as { id: string; title: string; location: string; shift: string | null; status: string },
     })),
     broadcasts: (broadcasts ?? []).map((b) => ({
@@ -131,9 +134,10 @@ export async function createWorker(data: CreateWorkerData) {
     name: data.name.trim(),
     phone: data.phone.trim(),
     city: data.city?.trim() || null,
+    main_intersection: data.main_intersection?.trim() || null,
     age: data.age ?? null,
     gender: data.gender ?? null,
-    shift: data.shift ?? null,
+    shifts: data.shifts?.length ? data.shifts : null,
     availability_type: data.availability_type ?? null,
     available_days: data.availability_type === 'part-time' ? (data.available_days ?? null) : null,
     notes: data.notes?.trim() || null,
@@ -161,9 +165,14 @@ export async function updateWorker(id: string, data: UpdateWorkerData) {
       ...(data.name !== undefined && { name: data.name.trim() }),
       ...(data.phone !== undefined && { phone: data.phone.trim() }),
       ...(data.city !== undefined && { city: data.city?.trim() || null }),
+      ...(data.main_intersection !== undefined && {
+        main_intersection: data.main_intersection?.trim() || null,
+      }),
       ...(data.age !== undefined && { age: data.age }),
       ...(data.gender !== undefined && { gender: data.gender }),
-      ...(data.shift !== undefined && { shift: data.shift }),
+      ...(data.shifts !== undefined && {
+        shifts: data.shifts && data.shifts.length > 0 ? data.shifts : null,
+      }),
       ...(data.availability_type !== undefined && { availability_type: data.availability_type }),
       ...(data.available_days !== undefined && {
         available_days: data.availability_type === 'part-time' ? data.available_days : null,

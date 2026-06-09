@@ -69,7 +69,7 @@ export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
       if (!w.name.toLowerCase().includes(q) && !w.phone.includes(q)) return false
     }
     if (gender !== 'all' && w.gender !== gender) return false
-    if (shift !== 'all' && w.shift !== shift) return false
+    if (shift !== 'all' && !w.shifts?.includes(shift)) return false
     if (avail !== 'all' && w.availability_type !== avail) return false
     if (assign === 'available' && w.is_assigned) return false
     if (assign === 'assigned' && !w.is_assigned) return false
@@ -324,7 +324,7 @@ function WorkerCard({ worker }: { worker: WorkerWithAssignment }) {
       {/* Chips */}
       <div className="flex flex-wrap gap-1.5">
         {worker.gender && <CoffeeChip>{worker.gender}</CoffeeChip>}
-        {worker.shift && <CoffeeChip>{worker.shift}</CoffeeChip>}
+        {worker.shifts?.map((s) => <CoffeeChip key={s}>{s}</CoffeeChip>)}
         {worker.availability_type && (
           <CoffeeChip>{worker.availability_type === 'full-time' ? 'Full-Time' : 'Part-Time'}</CoffeeChip>
         )}

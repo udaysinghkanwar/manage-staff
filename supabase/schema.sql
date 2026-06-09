@@ -11,9 +11,13 @@ create table public.workers (
   name              text        not null,
   phone             text        not null unique,
   city              text,
+  main_intersection text,
   age               integer     check (age >= 18 and age < 120),
   gender            text        check (gender in ('male', 'female')),
-  shift             text        check (shift in ('day', 'afternoon', 'night')),
+  shifts            text[]      check (
+                                  shifts is null
+                                  or shifts <@ array['day','afternoon','night']
+                                ),
   availability_type text        check (availability_type in ('full-time', 'part-time')),
   available_days    text[]      -- only populated when part-time; values: mon/tue/wed/thu/fri/sat/sun
                                 check (

@@ -4,9 +4,10 @@ import type { DayOfWeek, ShiftType, AvailabilityType, WorkerGender } from '@/lib
 export interface ParsedWorkerData {
   name: string | null
   city: string | null
+  main_intersection: string | null
   age: number | null
   gender: WorkerGender | null
-  shift: ShiftType | null
+  shifts: ShiftType[] | null
   availability_type: AvailabilityType | null
   available_days: DayOfWeek[] | null
   notes: string | null
@@ -15,9 +16,10 @@ export interface ParsedWorkerData {
 const EMPTY: ParsedWorkerData = {
   name: null,
   city: null,
+  main_intersection: null,
   age: null,
   gender: null,
-  shift: null,
+  shifts: null,
   availability_type: null,
   available_days: null,
   notes: null,
@@ -28,9 +30,10 @@ Return ONLY a JSON object with these fields (use null for anything not mentioned
 {
   "name": string | null,
   "city": string | null,
+  "main_intersection": string | null,
   "age": integer | null,
   "gender": "male" | "female" | null,
-  "shift": "day" | "afternoon" | "night" | null,
+  "shifts": ("day" | "afternoon" | "night")[] | null,
   "availability_type": "full-time" | "part-time" | null,
   "available_days": string[] | null,
   "notes": string | null
@@ -44,8 +47,20 @@ city rules:
 - If only a city is given without a province, assume "ON" (this is an Ontario-based agency).
 - If no location is mentioned at all, return null.
 
+main_intersection rules:
+- Free-form string naming the nearest major intersection (e.g. "Bramalea and Queen St", "Bathurst & Lawrence").
+- Only populate this when the sender explicitly mentions an intersection, cross-streets, or major nearby roads — never infer from a city or postal code.
+- Use "and" or "&" between the two roads exactly as the sender wrote them; do not invent or normalize road names.
+- Return null when not mentioned.
+
 age rules:
 - Return an integer between 18 and 119, or null if not mentioned or out of range.
+
+shifts rules:
+- Return an array of shifts the worker is available for. Workers can list multiple (e.g. "day and afternoon" → ["day", "afternoon"]).
+- Allowed values: "day", "afternoon", "night". Use lowercase exactly as listed.
+- Map common synonyms: "morning" → "day", "evening" → "afternoon", "graveyard"/"overnight" → "night".
+- Return null if no shift preference is mentioned.
 
 available_days rules:
 - Values must be from: mon, tue, wed, thu, fri, sat, sun.
@@ -85,9 +100,19 @@ export async function parseAvailabilityMessage(
     const result: ParsedWorkerData = {
       name: parsed.name ?? null,
       city: typeof parsed.city === 'string' ? parsed.city.trim() || null : null,
+      main_intersection:
+        typeof parsed.main_intersection === 'string'
+          ? parsed.main_intersection.trim() || null
+          : null,
       age: ageNum,
       gender: parsed.gender ?? null,
-      shift: parsed.shift ?? null,
+      shifts: (() => {
+        if (!Array.isArray(parsed.shifts)) return null
+        const valid = parsed.shifts.filter(
+          (s: unknown) => s === 'day' || s === 'afternoon' || s === 'night',
+        ) as ShiftType[]
+        return valid.length > 0 ? valid : null
+      })(),
       availability_type: parsed.availability_type ?? null,
       available_days: Array.isArray(parsed.available_days) ? parsed.available_days : null,
       notes: parsed.notes ?? null,

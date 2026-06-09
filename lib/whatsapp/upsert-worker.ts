@@ -25,9 +25,10 @@ export async function upsertWorker(
     const updates: Record<string, unknown> = {}
     if (parsed.name)              updates.name = parsed.name
     if (parsed.city)              updates.city = parsed.city
+    if (parsed.main_intersection) updates.main_intersection = parsed.main_intersection
     if (parsed.age)               updates.age = parsed.age
     if (parsed.gender)            updates.gender = parsed.gender
-    if (parsed.shift)             updates.shift = parsed.shift
+    if (parsed.shifts?.length)    updates.shifts = parsed.shifts
     if (parsed.availability_type) updates.availability_type = parsed.availability_type
     if (parsed.available_days)    updates.available_days = parsed.available_days
     if (parsed.notes)             updates.notes = parsed.notes
@@ -45,9 +46,10 @@ export async function upsertWorker(
         phone,
         name: parsed.name ?? 'Unknown',
         city: parsed.city ?? null,
+        main_intersection: parsed.main_intersection ?? null,
         age: parsed.age ?? null,
         gender: parsed.gender ?? null,
-        shift: parsed.shift ?? null,
+        shifts: parsed.shifts ?? null,
         availability_type: parsed.availability_type ?? null,
         available_days: parsed.available_days ?? null,
         notes: parsed.notes ?? null,

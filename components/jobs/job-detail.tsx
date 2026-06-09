@@ -565,9 +565,9 @@ function MatchedWorkers({
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {formatPhone(w.phone)}
                   </p>
-                  {w.city && (
+                  {(w.city || w.main_intersection) && (
                     <p className="text-xs text-muted-foreground truncate">
-                      {w.city}
+                      {[w.city, w.main_intersection].filter(Boolean).join(" · ")}
                     </p>
                   )}
                   {w.availability_type === "part-time" &&
@@ -577,11 +577,19 @@ function MatchedWorkers({
                     </p>
                   ) : null}
                 </div>
-                <div className="text-right shrink-0">
-                  <Badge variant="secondary" className="capitalize text-xs">
-                    {w.shift}
-                  </Badge>
-                  <p className="text-xs text-muted-foreground mt-1 capitalize">
+                <div className="text-right shrink-0 space-y-1">
+                  <div className="flex flex-wrap gap-1 justify-end">
+                    {w.shifts?.map((s) => (
+                      <Badge
+                        key={s}
+                        variant="secondary"
+                        className="capitalize text-xs"
+                      >
+                        {s}
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground capitalize">
                     {w.availability_type}
                   </p>
                 </div>

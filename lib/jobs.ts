@@ -8,6 +8,7 @@ import type { WorkerWithAssignment } from '@/lib/workers'
 
 export interface JobWithCount extends Job {
   assigned_count: number
+  company_name: string | null
 }
 
 export interface CreateJobData {
@@ -62,16 +63,21 @@ export async function getJobs(): Promise<JobWithCount[]> {
 
   const { data, error } = await supabase
     .from('jobs')
-    .select('*, job_assignments(id)')
+    .select('*, job_assignments(id), companies(name)')
     .order('created_at', { ascending: false })
 
   if (error) throw new Error(error.message)
 
-  return (data ?? []).map((j) => ({
-    ...j,
-    job_assignments: undefined,
-    assigned_count: (j.job_assignments ?? []).length,
-  }))
+  return (data ?? []).map((j) => {
+    const company = Array.isArray(j.companies) ? j.companies[0] : j.companies
+    return {
+      ...j,
+      job_assignments: undefined,
+      companies: undefined,
+      assigned_count: (j.job_assignments ?? []).length,
+      company_name: (company as { name: string } | null)?.name ?? null,
+    }
+  })
 }
 
 export async function getJob(id: string): Promise<JobDetail> {

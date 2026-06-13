@@ -310,7 +310,14 @@ function JobCard({ job }: { job: JobWithCount }) {
     >
       {/* Top row: title + status */}
       <div className="flex items-start justify-between gap-2 mb-1">
-        <p className="font-semibold text-card-foreground text-sm leading-snug truncate">{job.title}</p>
+        <p className="text-sm leading-snug truncate min-w-0">
+          <span className="font-semibold text-card-foreground">
+            {job.company_name ?? job.title}
+          </span>
+          {job.company_name && (
+            <span className="ml-1.5 text-xs text-muted-foreground">{job.title}</span>
+          )}
+        </p>
         <span className={cn(
           'shrink-0 text-xs font-medium px-2.5 py-0.5 rounded-full border capitalize',
           STATUS_STYLES[job.status]

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -35,7 +36,7 @@ import { Counter } from "@/components/ui/counter";
 import { CompanyPicker } from "@/components/ui/company-picker";
 import { formatCompanyLocation } from "@/lib/company-utils";
 import { formatPhone } from "@/lib/phone";
-import { Building2, MapPin, ShieldAlert, Users, Radio } from "lucide-react";
+import { Building2, MapPin, ShieldAlert, Users, Radio, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ShiftType, JobType, Company } from "@/lib/types";
 
@@ -455,7 +456,9 @@ function MatchedWorkers({
 }) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [assignConfirmOpen, setAssignConfirmOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const router = useRouter();
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -487,6 +490,32 @@ function MatchedWorkers({
     });
   }
 
+  function handleAssignDirect() {
+    startTransition(async () => {
+      const ids = Array.from(selected);
+      const results = await Promise.all(
+        ids.map((id) => assignWorker(jobId, id)),
+      );
+      const assigned = results.filter((r) => !r?.error).length;
+      const failed = results.length - assigned;
+
+      setAssignConfirmOpen(false);
+      setSelected(new Set());
+
+      if (assigned > 0 && failed === 0) {
+        toast.success(
+          `Assigned ${assigned} worker${assigned !== 1 ? "s" : ""}`,
+        );
+      } else if (assigned > 0 && failed > 0) {
+        toast.warning(`Assigned ${assigned}, ${failed} failed`);
+      } else {
+        toast.error("No workers could be assigned");
+      }
+
+      router.refresh();
+    });
+  }
+
   if (workers.length === 0) {
     return (
       <div className="rounded-xl border bg-card p-4">
@@ -510,14 +539,25 @@ function MatchedWorkers({
             </span>
           </h2>
           {selected.size > 0 && (
-            <Button
-              size="sm"
-              onClick={() => setConfirmOpen(true)}
-              className="gap-1.5 min-h-[36px]"
-            >
-              <Radio className="h-3.5 w-3.5" />
-              Broadcast ({selected.size})
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setAssignConfirmOpen(true)}
+                className="gap-1.5 min-h-[36px]"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                Assign directly ({selected.size})
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setConfirmOpen(true)}
+                className="gap-1.5 min-h-[36px]"
+              >
+                <Radio className="h-3.5 w-3.5" />
+                Broadcast ({selected.size})
+              </Button>
+            </div>
           )}
         </div>
 
@@ -627,6 +667,39 @@ function MatchedWorkers({
               className="min-h-[44px]"
             >
               {isPending ? "Sending…" : "Send broadcast"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign directly confirmation */}
+      <Dialog open={assignConfirmOpen} onOpenChange={setAssignConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Assign workers directly?</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            This will assign{" "}
+            <strong>
+              {selected.size} worker{selected.size !== 1 ? "s" : ""}
+            </strong>{" "}
+            to this job without sending a WhatsApp broadcast.
+          </p>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAssignConfirmOpen(false)}
+              disabled={isPending}
+              className="min-h-[44px]"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleAssignDirect}
+              disabled={isPending}
+              className="min-h-[44px]"
+            >
+              {isPending ? "Assigning…" : "Assign"}
             </Button>
           </DialogFooter>
         </DialogContent>

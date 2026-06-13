@@ -502,8 +502,23 @@ export function WorkerDetail({ data }: { data: WorkerHistory }) {
                         className="w-4 h-4"
                       />
                       <div className="min-w-0">
-                        <p className="font-medium text-sm">{j.title}</p>
+                        <p className="text-sm truncate">
+                          <span className="font-medium">
+                            {j.company_name ?? j.title}
+                          </span>
+                          {j.company_name && (
+                            <span className="ml-1.5 text-xs text-muted-foreground">
+                              {j.title}
+                            </span>
+                          )}
+                        </p>
                         <p className="text-xs text-muted-foreground capitalize">
+                          {j.job_date && (
+                            <>
+                              {new Date(j.job_date + "T00:00:00").toLocaleDateString("en-CA", { month: "short", day: "numeric" })}
+                              {" · "}
+                            </>
+                          )}
                           {j.location} · {j.shift ?? "any shift"} ·{" "}
                           {j.assigned_count} assigned
                         </p>

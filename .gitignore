@@ -36,6 +36,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# supabase cli local state (contains project ref + pooler connection string)
+supabase/.temp/
+
+# operational notes with live Meta/Vercel identifiers — keep local only
+docs/handover.md
+
 # agent tooling
 .claude
 .agents

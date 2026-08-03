@@ -34,6 +34,15 @@ type AvailFilter = "all" | "full-time" | "part-time";
 // "Status" combines assignment state + record state. Default ('all') shows all
 // active workers; 'inactive' is opt-in and shows only inactive worker records.
 type StatusFilter = "all" | "available" | "assigned" | "inactive";
+// Sort order. Defaults to newest-first so recently registered candidates
+// surface immediately instead of being buried in an alphabetical list.
+type SortKey = "recent" | "oldest" | "name";
+
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: "recent", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "name", label: "Name (A–Z)" },
+];
 
 function Chip({
   active,
@@ -87,6 +96,7 @@ export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
   const [avail, setAvail] = useState<AvailFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [locationsSelected, setLocationsSelected] = useState<string[]>([]);
+  const [sort, setSort] = useState<SortKey>("recent");
   const [showFilters, setShowFilters] = useState(false);
   // Subscribe to localStorage via useSyncExternalStore for SSR-safe hydration.
   const persistedView = useSyncExternalStore(
@@ -162,10 +172,20 @@ export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
     return true;
   });
 
+  // `filtered` is a fresh array from .filter(), so sorting it in place is safe.
+  // Ties fall back to name so paging stays stable for identical timestamps.
+  filtered.sort((a, b) => {
+    if (sort === "name") return a.name.localeCompare(b.name);
+    const at = Date.parse(a.created_at ?? "") || 0;
+    const bt = Date.parse(b.created_at ?? "") || 0;
+    if (at !== bt) return sort === "recent" ? bt - at : at - bt;
+    return a.name.localeCompare(b.name);
+  });
+
   // Pagination — reset to page 1 when filters/search/view change.
   // Tracking the previous signature in state lets us reset during render
   // instead of via useEffect (React's recommended pattern).
-  const filterSig = `${search}|${gender}|${shift}|${avail}|${status}|${locationsSelected.join(",")}|${view}`;
+  const filterSig = `${search}|${gender}|${shift}|${avail}|${status}|${locationsSelected.join(",")}|${sort}|${view}`;
   const [prevFilterSig, setPrevFilterSig] = useState(filterSig);
   if (filterSig !== prevFilterSig) {
     setPrevFilterSig(filterSig);
@@ -311,6 +331,16 @@ export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
             options={locations.map((l) => ({ value: l, label: l }))}
           />
         )}
+        {/* Sort sits with the filters but is deliberately excluded from Reset —
+            it's a view preference, not a filter. */}
+        <div className="ml-auto">
+          <FilterDropdown
+            label="Sort by"
+            value={sort}
+            onValueChange={(v) => setSort(v as SortKey)}
+            options={SORT_OPTIONS}
+          />
+        </div>
         {isFiltered && (
           <div className="flex flex-col gap-1">
             <span className="text-xs text-transparent select-none">
@@ -398,6 +428,24 @@ export function WorkerList({ workers }: { workers: WorkerWithAssignment[] }) {
             </div>
 
             <div className="px-5 pb-24 space-y-5">
+              {/* Sort */}
+              <div>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  Sort by
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {SORT_OPTIONS.map((o) => (
+                    <Chip
+                      key={o.value}
+                      active={sort === o.value}
+                      onClick={() => setSort(o.value)}
+                    >
+                      {o.label}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+
               {/* Status */}
               <div>
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
@@ -566,11 +614,14 @@ function WorkerCard({
         <StatusPill status={workerStatusLabel(worker)} />
       </div>
 
-      {/* Phone */}
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground mb-3">
-        <Phone className="h-3 w-3 shrink-0" />
-        {formatPhone(worker.phone)}
-      </p>
+      {/* Phone + registration date */}
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground mb-3">
+        <span className="flex items-center gap-1.5 min-w-0">
+          <Phone className="h-3 w-3 shrink-0" />
+          <span className="truncate">{formatPhone(worker.phone)}</span>
+        </span>
+        <span className="shrink-0">{formatAdded(worker.created_at)}</span>
+      </div>
 
       {/* Chips */}
       <div className="flex flex-wrap gap-1.5">
@@ -790,6 +841,27 @@ function formatTypeLabel(t: string | null | undefined): string {
       : "—";
 }
 
+// Registration date, compact: relative for the first week (so new candidates
+// stand out at a glance), then a short absolute date.
+function formatAdded(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return "—";
+  const days = Math.floor((Date.now() - t) / 86_400_000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return `${days}d ago`;
+  const d = new Date(t);
+  // Pin the zone: server and client must format identically or React warns
+  // about a hydration mismatch.
+  return d.toLocaleDateString("en-CA", {
+    timeZone: "America/New_York",
+    month: "short",
+    day: "numeric",
+    ...(d.getFullYear() !== new Date().getFullYear() && { year: "numeric" }),
+  });
+}
+
 // ─── List (table) view ──────────────────────────────────────────────────────
 
 function WorkerListView({
@@ -829,6 +901,7 @@ function WorkerListView({
                 <th className={cn(TH, "max-[1180px]:hidden")}>Type</th>
                 <th className={cn(TH, "max-[880px]:hidden")}>Days</th>
                 <th className={TH}>Location</th>
+                <th className={cn(TH, "max-[1260px]:hidden")}>Added</th>
                 <th className={TH}>Status</th>
                 <th className="w-9 border-b border-border" />
               </tr>
@@ -879,9 +952,14 @@ function MobileWorkerRow({
           <span className="text-sm font-semibold truncate">{worker.name}</span>
           <StatusPill status={status} />
         </div>
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {formatPhone(worker.phone)}
-        </span>
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {formatPhone(worker.phone)}
+          </span>
+          <span className="text-xs text-muted-foreground shrink-0">
+            {formatAdded(worker.created_at)}
+          </span>
+        </div>
         {locationLine && (
           <span className="text-xs text-muted-foreground truncate">
             {locationLine}
@@ -960,6 +1038,9 @@ function WorkerRow({
             </span>
           )}
         </div>
+      </td>
+      <td className="max-[1260px]:hidden px-4 py-3 align-middle text-sm text-muted-foreground whitespace-nowrap">
+        {formatAdded(worker.created_at)}
       </td>
       <td className="px-4 py-3 align-middle">
         <StatusPill status={status} />

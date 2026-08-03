@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { DatePicker } from '@/components/ui/date-picker'
 import { FilterDropdown } from '@/components/ui/filter-dropdown'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { Briefcase, Search, Plus, ShieldAlert, Users, CalendarDays, X, SlidersHorizontal } from 'lucide-react'
+import { Briefcase, Search, Plus, Users, CalendarDays, X, SlidersHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { JobWithCount } from '@/lib/jobs'
 
@@ -340,12 +340,6 @@ function JobCard({ job }: { job: JobWithCount }) {
       {/* Chips + assigned count */}
       <div className="flex flex-wrap items-center gap-1.5">
         {job.shift && <CoffeeChip>{job.shift}</CoffeeChip>}
-        {job.safety_shoes_required && (
-          <CoffeeChip>
-            <ShieldAlert className="h-3 w-3" />
-            Safety Shoes
-          </CoffeeChip>
-        )}
         <span className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
           <Users className="h-3 w-3" />
           {job.assigned_count} assigned

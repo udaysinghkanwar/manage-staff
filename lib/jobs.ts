@@ -17,7 +17,6 @@ export interface CreateJobData {
   job_type: JobType
   shift: ShiftType
   description?: string
-  safety_shoes_required: boolean
   job_date?: string | null
   required_male?: number
   required_female?: number
@@ -259,7 +258,6 @@ export async function createJob(data: CreateJobData) {
       job_type: data.job_type,
       shift: data.shift,
       description: data.description?.trim() || null,
-      safety_shoes_required: data.safety_shoes_required,
       job_date: data.job_type === 'on-call' ? (data.job_date ?? null) : null,
       required_male: data.required_male ?? 0,
       required_female: data.required_female ?? 0,
@@ -283,7 +281,6 @@ export async function updateJob(id: string, data: UpdateJobData) {
       ...(data.location !== undefined && { location: data.location!.trim() }),
       ...(data.shift !== undefined && { shift: data.shift }),
       ...(data.description !== undefined && { description: data.description?.trim() || null }),
-      ...(data.safety_shoes_required !== undefined && { safety_shoes_required: data.safety_shoes_required }),
       ...(data.job_type !== undefined && { job_type: data.job_type }),
       ...(data.job_date !== undefined && { job_date: data.job_date ?? null }),
       ...(data.required_male !== undefined && { required_male: data.required_male }),

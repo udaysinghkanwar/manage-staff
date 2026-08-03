@@ -47,7 +47,6 @@ export interface Job {
   job_type: JobType
   shift: ShiftType | null
   description: string | null
-  safety_shoes_required: boolean
   job_date: string | null
   required_male: number
   required_female: number

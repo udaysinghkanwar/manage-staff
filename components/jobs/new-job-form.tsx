@@ -20,7 +20,6 @@ async function submit(_prev: FormState, formData: FormData): Promise<FormState> 
   const job_type = (formData.get('job_type') as JobType) || 'on-call'
   const shift = formData.get('shift') as ShiftType | null
   const description = formData.get('description') as string
-  const safety_shoes_required = formData.get('safety_shoes_required') === 'true'
   const job_date = job_type === 'on-call' ? ((formData.get('job_date') as string) || null) : null
   const required_male = parseInt(formData.get('required_male') as string) || 0
   const required_female = parseInt(formData.get('required_female') as string) || 0
@@ -33,7 +32,6 @@ async function submit(_prev: FormState, formData: FormData): Promise<FormState> 
 
   const result = await createJob({
     title, location, job_type, shift: shift!, description,
-    safety_shoes_required,
     job_date, required_male, required_female,
     company_id,
   })
@@ -44,7 +42,6 @@ async function submit(_prev: FormState, formData: FormData): Promise<FormState> 
 export function NewJobForm({ companies: initialCompanies }: { companies: Company[] }) {
   const [state, action, pending] = useActionState(submit, null)
   const [jobType, setJobType] = useState<JobType>('on-call')
-  const [safetyShoes, setSafetyShoes] = useState(false)
   const [jobDate, setJobDate] = useState<string | null>(null)
   const [requiredMale, setRequiredMale] = useState(0)
   const [requiredFemale, setRequiredFemale] = useState(0)
@@ -136,13 +133,6 @@ export function NewJobForm({ companies: initialCompanies }: { companies: Company
         <Label htmlFor="description">Work description</Label>
         <Textarea id="description" name="description" placeholder="Describe the work…" rows={3} />
       </div>
-
-      <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
-        <input type="checkbox" className="w-4 h-4" checked={safetyShoes}
-          onChange={(e) => setSafetyShoes(e.target.checked)} />
-        <input type="hidden" name="safety_shoes_required" value={String(safetyShoes)} />
-        <span className="text-sm font-medium">Safety shoes required</span>
-      </label>
 
       <div className="space-y-3">
         <p className="text-sm font-medium">Workers needed</p>

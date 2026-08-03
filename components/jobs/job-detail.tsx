@@ -36,7 +36,7 @@ import { Counter } from "@/components/ui/counter";
 import { CompanyPicker } from "@/components/ui/company-picker";
 import { formatCompanyLocation } from "@/lib/company-utils";
 import { formatPhone } from "@/lib/phone";
-import { Building2, MapPin, ShieldAlert, Users, Radio, UserPlus } from "lucide-react";
+import { Building2, MapPin, Users, Radio, UserPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ShiftType, JobType, Company } from "@/lib/types";
 
@@ -76,7 +76,6 @@ function JobInfo({
   const [jobType, setJobType] = useState<JobType>(job.job_type);
   const [shift, setShift] = useState<ShiftType | "">(job.shift ?? "");
   const [description, setDescription] = useState(job.description ?? "");
-  const [safetyShoes, setSafetyShoes] = useState(job.safety_shoes_required);
   const [jobDate, setJobDate] = useState<string | null>(job.job_date ?? null);
   const [requiredMale, setRequiredMale] = useState(job.required_male ?? 0);
   const [requiredFemale, setRequiredFemale] = useState(
@@ -102,7 +101,6 @@ function JobInfo({
     setJobType(job.job_type);
     setShift(job.shift ?? "");
     setDescription(job.description ?? "");
-    setSafetyShoes(job.safety_shoes_required);
     setJobDate(job.job_date ?? null);
     setRequiredMale(job.required_male ?? 0);
     setRequiredFemale(job.required_female ?? 0);
@@ -132,7 +130,6 @@ function JobInfo({
         job_type: jobType,
         shift: shift || undefined,
         description: description || undefined,
-        safety_shoes_required: safetyShoes,
         job_date: jobType === 'on-call' ? jobDate : null,
         required_male: requiredMale,
         required_female: requiredFemale,
@@ -269,15 +266,6 @@ function JobInfo({
               rows={3}
             />
           </div>
-          <label className="flex items-center gap-3 cursor-pointer min-h-[44px]">
-            <input
-              type="checkbox"
-              checked={safetyShoes}
-              onChange={(e) => setSafetyShoes(e.target.checked)}
-              className="w-4 h-4"
-            />
-            <span className="text-sm font-medium">Safety shoes required</span>
-          </label>
           <div className="space-y-3">
             <p className="text-sm font-medium">Workers needed</p>
             <div className="flex items-center justify-between">
@@ -365,20 +353,7 @@ function JobInfo({
             </dd>
           </div>
 
-          {/* Row 3: Safety shoes | Workers needed */}
-          <div>
-            <dt className="text-muted-foreground">Safety shoes</dt>
-            <dd className="font-medium flex items-center gap-1 mt-0.5">
-              {job.safety_shoes_required ? (
-                <>
-                  <ShieldAlert className="h-3.5 w-3.5 text-amber-500" />{" "}
-                  Required
-                </>
-              ) : (
-                "Not required"
-              )}
-            </dd>
-          </div>
+          {/* Row 3: Workers needed */}
           <div>
             <dt className="text-muted-foreground">Workers needed</dt>
             <dd className="font-medium flex gap-4 mt-0.5">

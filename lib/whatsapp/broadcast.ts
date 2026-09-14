@@ -70,11 +70,6 @@ export async function broadcastJob(
           companyName,
           companyAddress,
           job.shift ?? 'TBD',
-          // Slot 7 is the safety-shoes line in the approved `job_broadcast`
-          // template. The field is gone from the app, but Meta rejects a
-          // param count that doesn't match the template, so we still fill it.
-          // Drop this once {{7}} is removed from the template in Meta.
-          'No',
           job.description ?? 'N/A',
         ],
       })

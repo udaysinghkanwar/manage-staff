@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatRelativeDate as formatAdded } from "@/lib/date-format";
 import { DAY_LABELS } from "@/lib/constants";
 import { formatPhone, normalizePhone } from "@/lib/phone";
 import type { WorkerWithAssignment } from "@/lib/workers";
@@ -839,27 +840,6 @@ function formatTypeLabel(t: string | null | undefined): string {
     : t === "part-time"
       ? "Part-Time"
       : "—";
-}
-
-// Registration date, compact: relative for the first week (so new candidates
-// stand out at a glance), then a short absolute date.
-function formatAdded(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const t = Date.parse(iso);
-  if (Number.isNaN(t)) return "—";
-  const days = Math.floor((Date.now() - t) / 86_400_000);
-  if (days <= 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 7) return `${days}d ago`;
-  const d = new Date(t);
-  // Pin the zone: server and client must format identically or React warns
-  // about a hydration mismatch.
-  return d.toLocaleDateString("en-CA", {
-    timeZone: "America/New_York",
-    month: "short",
-    day: "numeric",
-    ...(d.getFullYear() !== new Date().getFullYear() && { year: "numeric" }),
-  });
 }
 
 // ─── List (table) view ──────────────────────────────────────────────────────

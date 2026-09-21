@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import type { Job, JobType, ShiftType, DayOfWeek, Company } from '@/lib/types'
+import { DORMANT_AFTER_DAYS, NEW_WORKER_DAYS } from '@/lib/types'
 import type { WorkerWithAssignment } from '@/lib/workers'
 
 export interface JobWithCount extends Job {
@@ -32,6 +33,12 @@ export interface UpdateJobData extends Partial<Omit<CreateJobData, 'shift' | 'jo
 export interface MatchedWorker extends WorkerWithAssignment {
   location_match: boolean
   tier: 1 | 2 | 3 | 4
+  /** Most recent proof of life: inbound message, broadcast reply, or signup. ISO-8601 UTC. */
+  last_seen: string
+  /** False when last_seen is just the signup date — we have heard nothing since. */
+  has_contact: boolean
+  is_dormant: boolean
+  is_new: boolean
 }
 
 export interface BroadcastRow {
@@ -135,6 +142,35 @@ export async function getBroadcasts(jobId: string): Promise<BroadcastRow[]> {
   }))
 }
 
+type ActivityRow = {
+  messages?: Array<{ created_at: string; direction: string }> | null
+  job_broadcasts?: Array<{ responded_at: string | null }> | null
+  created_at: string
+}
+
+// Most recent proof that a worker is still reachable. Signup is the floor:
+// registration arrives as an inbound WhatsApp message, so a worker who just
+// joined reads as fresh on day one without needing a special case.
+//
+// `hasContact` reports whether anything beat that floor. It has to be decided
+// here rather than by comparing timestamps downstream: Postgres serializes
+// created_at with microseconds and a +00:00 offset, while last_seen is
+// re-serialized by toISOString() to milliseconds and Z, so the two never
+// compare equal as strings even when they refer to the same instant.
+function lastSeenAt(w: ActivityRow): { ms: number; hasContact: boolean } {
+  const signup = Date.parse(w.created_at) || 0
+  let t = signup
+  for (const m of w.messages ?? []) {
+    if (m.direction !== 'inbound') continue
+    t = Math.max(t, Date.parse(m.created_at) || 0)
+  }
+  for (const b of w.job_broadcasts ?? []) {
+    if (!b.responded_at) continue
+    t = Math.max(t, Date.parse(b.responded_at) || 0)
+  }
+  return { ms: t, hasContact: t > signup }
+}
+
 export async function getMatchedWorkers(
   jobId: string,
   job?: Job
@@ -183,7 +219,9 @@ export async function getMatchedWorkers(
         job_id,
         assigned_date,
         jobs ( status )
-      )
+      ),
+      messages ( created_at, direction ),
+      job_broadcasts ( responded_at )
     `)
     .eq('status', 'active')
     .order('name')
@@ -191,6 +229,7 @@ export async function getMatchedWorkers(
   if (error || !workers) return []
 
   const matched: MatchedWorker[] = []
+  const now = Date.now()
 
   for (const w of workers) {
     // Filter: gender must match (if job requires male/female)
@@ -225,20 +264,31 @@ export async function getMatchedWorkers(
       tier = 4
     }
 
+    const seen = lastSeenAt(w)
+
     matched.push({
       ...w,
       job_assignments: undefined,
+      messages: undefined,
+      job_broadcasts: undefined,
       is_assigned: false,
       assigned_job_id: null,
       assigned_job_title: null,
       location_match: cityMatch,
       tier,
+      last_seen: new Date(seen.ms).toISOString(),
+      has_contact: seen.hasContact,
+      is_dormant: now - seen.ms > DORMANT_AFTER_DAYS * 86_400_000,
+      is_new: now - (Date.parse(w.created_at) || 0) < NEW_WORKER_DAYS * 86_400_000,
     })
   }
 
-  // Sort by tier first, then by name
+  // Dormant workers sink below everyone still reachable; within a group, match
+  // quality leads and recency breaks ties.
   matched.sort((a, b) => {
+    if (a.is_dormant !== b.is_dormant) return a.is_dormant ? 1 : -1
     if (a.tier !== b.tier) return a.tier - b.tier
+    if (a.last_seen !== b.last_seen) return b.last_seen.localeCompare(a.last_seen)
     return a.name.localeCompare(b.name)
   })
 

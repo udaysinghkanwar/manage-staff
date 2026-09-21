@@ -36,9 +36,19 @@ import { Counter } from "@/components/ui/counter";
 import { CompanyPicker } from "@/components/ui/company-picker";
 import { formatCompanyLocation } from "@/lib/company-utils";
 import { formatPhone } from "@/lib/phone";
-import { Building2, MapPin, Users, Radio, UserPlus } from "lucide-react";
+import {
+  Building2,
+  MapPin,
+  Users,
+  Radio,
+  UserPlus,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ShiftType, JobType, Company } from "@/lib/types";
+import { DORMANT_AFTER_DAYS } from "@/lib/types";
+import { formatRelativeDate } from "@/lib/date-format";
 
 const STATUS_STYLES: Record<string, string> = {
   open: "bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400",
@@ -420,6 +430,103 @@ function JobInfo({
 
 // ─── Section B: Matched Workers ──────────────────────────────────────────────
 
+// One selectable worker row. Shared by the active and dormant lists so the two
+// groups stay visually identical — only their placement and dimming differ.
+function MatchedWorkerRow({
+  w,
+  checked,
+  onToggle,
+}: {
+  w: MatchedWorker;
+  checked: boolean;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <li
+      className={cn(
+        "flex items-center gap-3 rounded-lg border p-3 transition-colors",
+        checked ? "border-primary bg-primary/5" : "border-border",
+        w.is_dormant && "opacity-60",
+      )}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={() => onToggle(w.id)}
+        className="w-4 h-4 shrink-0 cursor-pointer"
+      />
+      <Link
+        href={`/dashboard/workers/${w.id}`}
+        className="flex flex-1 items-center gap-3 min-w-0 hover:opacity-75 transition-opacity"
+      >
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-medium text-sm">{w.name}</span>
+            <Badge
+              variant="outline"
+              className={cn("text-xs py-0", {
+                "border-emerald-500 text-emerald-600 dark:text-emerald-400": w.tier === 1,
+                "border-blue-500 text-blue-600 dark:text-blue-400": w.tier === 2,
+                "border-amber-500 text-amber-600 dark:text-amber-400": w.tier === 3,
+                "border-zinc-400 text-zinc-500": w.tier === 4,
+              })}
+            >
+              Tier {w.tier}
+            </Badge>
+            {w.is_new && (
+              <Badge
+                variant="outline"
+                className="text-xs py-0 border-violet-500 text-violet-600 dark:text-violet-400"
+              >
+                New
+              </Badge>
+            )}
+            {w.location_match && (
+              <Badge variant="outline" className="text-xs gap-1 py-0">
+                <MapPin className="h-3 w-3" /> Local
+              </Badge>
+            )}
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {formatPhone(w.phone)}
+          </p>
+          {(w.city || w.main_intersection) && (
+            <p className="text-xs text-muted-foreground truncate">
+              {[w.city, w.main_intersection].filter(Boolean).join(" · ")}
+            </p>
+          )}
+          {w.availability_type === "part-time" &&
+          w.available_days?.length ? (
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {w.available_days.map((d) => DAY_LABELS[d]).join(" · ")}
+            </p>
+          ) : null}
+        </div>
+        <div className="text-right shrink-0 space-y-1">
+          <div className="flex flex-wrap gap-1 justify-end">
+            {w.shifts?.map((s) => (
+              <Badge
+                key={s}
+                variant="secondary"
+                className="capitalize text-xs"
+              >
+                {s}
+              </Badge>
+            ))}
+          </div>
+          <p className="text-xs text-muted-foreground capitalize">
+            {w.availability_type}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {w.has_contact ? "seen " : "joined "}
+            {formatRelativeDate(w.last_seen)}
+          </p>
+        </div>
+      </Link>
+    </li>
+  );
+}
+
 function MatchedWorkers({
   workers,
   jobId,
@@ -432,8 +539,14 @@ function MatchedWorkers({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [assignConfirmOpen, setAssignConfirmOpen] = useState(false);
+  const [showDormant, setShowDormant] = useState(false);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+
+  // Already sorted dormant-last by getMatchedWorkers, so a single pass splits
+  // the two groups while preserving order within each.
+  const active = workers.filter((w) => !w.is_dormant);
+  const dormant = workers.filter((w) => w.is_dormant);
 
   function toggle(id: string) {
     setSelected((prev) => {
@@ -510,7 +623,7 @@ function MatchedWorkers({
           <h2 className="font-medium">
             Matched Workers{" "}
             <span className="text-muted-foreground font-normal text-sm">
-              ({workers.length})
+              ({active.length})
             </span>
           </h2>
           {selected.size > 0 && (
@@ -537,81 +650,47 @@ function MatchedWorkers({
         </div>
 
         <ul className="space-y-2">
-          {workers.map((w) => (
-            <li
+          {active.map((w) => (
+            <MatchedWorkerRow
               key={w.id}
-              className={cn(
-                "flex items-center gap-3 rounded-lg border p-3 transition-colors",
-                selected.has(w.id)
-                  ? "border-primary bg-primary/5"
-                  : "border-border",
-              )}
-            >
-              <input
-                type="checkbox"
-                checked={selected.has(w.id)}
-                onChange={() => toggle(w.id)}
-                className="w-4 h-4 shrink-0 cursor-pointer"
-              />
-              <Link
-                href={`/dashboard/workers/${w.id}`}
-                className="flex flex-1 items-center gap-3 min-w-0 hover:opacity-75 transition-opacity"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-medium text-sm">{w.name}</span>
-                    <Badge
-                      variant="outline"
-                      className={cn("text-xs py-0", {
-                        "border-emerald-500 text-emerald-600 dark:text-emerald-400": w.tier === 1,
-                        "border-blue-500 text-blue-600 dark:text-blue-400": w.tier === 2,
-                        "border-amber-500 text-amber-600 dark:text-amber-400": w.tier === 3,
-                        "border-zinc-400 text-zinc-500": w.tier === 4,
-                      })}
-                    >
-                      Tier {w.tier}
-                    </Badge>
-                    {w.location_match && (
-                      <Badge variant="outline" className="text-xs gap-1 py-0">
-                        <MapPin className="h-3 w-3" /> Local
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {formatPhone(w.phone)}
-                  </p>
-                  {(w.city || w.main_intersection) && (
-                    <p className="text-xs text-muted-foreground truncate">
-                      {[w.city, w.main_intersection].filter(Boolean).join(" · ")}
-                    </p>
-                  )}
-                  {w.availability_type === "part-time" &&
-                  w.available_days?.length ? (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {w.available_days.map((d) => DAY_LABELS[d]).join(" · ")}
-                    </p>
-                  ) : null}
-                </div>
-                <div className="text-right shrink-0 space-y-1">
-                  <div className="flex flex-wrap gap-1 justify-end">
-                    {w.shifts?.map((s) => (
-                      <Badge
-                        key={s}
-                        variant="secondary"
-                        className="capitalize text-xs"
-                      >
-                        {s}
-                      </Badge>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground capitalize">
-                    {w.availability_type}
-                  </p>
-                </div>
-              </Link>
-            </li>
+              w={w}
+              checked={selected.has(w.id)}
+              onToggle={toggle}
+            />
           ))}
         </ul>
+
+        {dormant.length > 0 && (
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={() => setShowDormant((v) => !v)}
+              className="flex w-full items-center gap-1.5 rounded-lg px-1 py-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              {showDormant ? (
+                <ChevronDown className="h-3.5 w-3.5 shrink-0" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+              )}
+              <span>
+                Dormant &mdash; no contact in {DORMANT_AFTER_DAYS}+ days (
+                {dormant.length})
+              </span>
+            </button>
+            {showDormant && (
+              <ul className="space-y-2 pt-1">
+                {dormant.map((w) => (
+                  <MatchedWorkerRow
+                    key={w.id}
+                    w={w}
+                    checked={selected.has(w.id)}
+                    onToggle={toggle}
+                  />
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Confirmation dialog */}

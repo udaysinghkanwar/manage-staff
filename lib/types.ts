@@ -81,3 +81,11 @@ export interface Message {
   is_availability_message: boolean
   created_at: string
 }
+
+// A worker with no inbound message or broadcast response in this many days is
+// treated as dormant: still matchable, but sorted out of the primary list.
+// Tuned to the observed ~1 month active-worker lifecycle.
+export const DORMANT_AFTER_DAYS = 30
+
+// Workers registered within this window carry a "New" badge in match lists.
+export const NEW_WORKER_DAYS = 14

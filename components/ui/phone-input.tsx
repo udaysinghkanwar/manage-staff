@@ -36,7 +36,7 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
 
     return (
       <div className="flex items-center gap-0 rounded-lg border border-input bg-background focus-within:ring-2 focus-within:ring-ring overflow-hidden">
-        <span className="pl-3 pr-1.5 text-sm text-muted-foreground select-none shrink-0">+1</span>
+        <span className="pl-3 pr-1.5 text-base md:text-sm text-muted-foreground select-none shrink-0">+1</span>
         <input
           ref={ref}
           type="tel"
@@ -45,7 +45,7 @@ export const PhoneInput = forwardRef<HTMLInputElement, PhoneInputProps>(
           onChange={handleChange}
           placeholder="(416) 555-0002"
           className={cn(
-            'flex-1 bg-transparent py-2 pr-3 text-sm text-foreground placeholder:text-muted-foreground outline-none min-h-[44px]',
+            'flex-1 bg-transparent py-2 pr-3 text-base md:text-sm text-foreground placeholder:text-muted-foreground outline-none min-h-[44px]',
             className
           )}
           {...props}

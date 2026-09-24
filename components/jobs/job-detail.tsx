@@ -449,12 +449,16 @@ function MatchedWorkerRow({
         w.is_dormant && "opacity-60",
       )}
     >
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={() => onToggle(w.id)}
-        className="w-4 h-4 shrink-0 cursor-pointer"
-      />
+      {/* 44x44 touch target per iOS guidance; the negative margin keeps the
+          box's layout footprint at the checkbox's own 16px so rows don't shift. */}
+      <label className="flex h-11 w-11 -m-3.5 shrink-0 cursor-pointer items-center justify-center">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={() => onToggle(w.id)}
+          className="w-4 h-4 cursor-pointer"
+        />
+      </label>
       <Link
         href={`/dashboard/workers/${w.id}`}
         className="flex flex-1 items-center gap-3 min-w-0 hover:opacity-75 transition-opacity"

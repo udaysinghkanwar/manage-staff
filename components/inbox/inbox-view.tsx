@@ -199,6 +199,18 @@ function MessageThread({
   )
 }
 
+// crypto.randomUUID() is only exposed in secure contexts (HTTPS or localhost),
+// so it is undefined when the dev server is opened over a plain-HTTP LAN address
+// -- e.g. testing on a phone. The value only has to be unique per mount, since
+// it exists to keep Strict Mode's double-invocation from reusing a channel
+// name, so a non-cryptographic fallback is equivalent here.
+function uniqueChannelSuffix(): string {
+  return (
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+  )
+}
+
 export function InboxView({ initialConversations }: { initialConversations: Conversation[] }) {
   const [conversations, setConversations] = useState(initialConversations)
   const [selected, setSelected] = useState<string | null>(null)
@@ -246,7 +258,7 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
     const channel = supabase
-      .channel(`inbox-messages-${crypto.randomUUID()}`)
+      .channel(`inbox-messages-${uniqueChannelSuffix()}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
@@ -315,7 +327,7 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] md:h-screen overflow-hidden">
+    <div className="flex h-[calc(100dvh-4rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] md:h-dvh overflow-hidden">
       {/* Conversation list */}
       <div className={cn(
         'w-full md:w-80 md:border-r md:border-border flex-col overflow-y-auto shrink-0',

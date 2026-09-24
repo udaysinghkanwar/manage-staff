@@ -17,9 +17,9 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-dvh bg-background flex">
       {/* Desktop sidebar */}
-      <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-sidebar border-r border-sidebar-border">
+      <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 pl-[env(safe-area-inset-left)] bg-sidebar border-r border-sidebar-border">
         <div className="flex flex-col h-full">
           <Link
             href="/dashboard"
@@ -34,14 +34,18 @@ export default async function DashboardLayout({
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 md:ml-64 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 min-h-screen">
+      <main className="flex-1 min-w-0 md:ml-64 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)] min-h-dvh">
         {children}
       </main>
 
       {/* Mobile bottom tab bar */}
       <nav
         className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-sidebar border-t border-sidebar-border"
-        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          paddingLeft: 'env(safe-area-inset-left)',
+          paddingRight: 'env(safe-area-inset-right)',
+        }}
       >
         <DashboardNav mobile />
       </nav>

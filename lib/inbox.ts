@@ -29,12 +29,24 @@ export interface Conversation {
 export async function getConversations(): Promise<Conversation[]> {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
-    .from('messages')
-    .select('id, phone, bsuid, worker_id, direction, body, is_availability_message, created_at, workers(id, name)')
-    .order('created_at', { ascending: true })
+  // Supabase caps a query at 1000 rows, so a single select silently dropped
+  // every message past the first 1000 -- the inbox stopped showing anything
+  // newer. Read in pages until a short page signals the end. `id` breaks ties
+  // on created_at so rows can't shift between pages.
+  const PAGE = 1000
+  const data = []
+  for (let from = 0; ; from += PAGE) {
+    const { data: page, error } = await supabase
+      .from('messages')
+      .select('id, phone, bsuid, worker_id, direction, body, is_availability_message, created_at, workers(id, name)')
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + PAGE - 1)
 
-  if (error) throw new Error(error.message)
+    if (error) throw new Error(error.message)
+    data.push(...(page ?? []))
+    if (!page || page.length < PAGE) break
+  }
 
   const byPhone = new Map<string, Conversation>()
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()

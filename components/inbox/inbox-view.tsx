@@ -1,15 +1,25 @@
 'use client'
 
-import { useState, useEffect, useRef, useTransition, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useTransition, useCallback } from 'react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { getConversations, sendReply } from '@/lib/inbox'
-import type { Conversation, Message } from '@/lib/inbox'
+import {
+  getConversations,
+  getConversation,
+  getConversationCount,
+  getMessages,
+  sendReply,
+} from '@/lib/inbox'
+import type { Conversation, Message, Cursor, Page } from '@/lib/inbox'
 import { Button } from '@/components/ui/button'
 import { MessageSquare, ChevronLeft, Send, ExternalLink, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { conversationKey, formatContact, parseConversationKey } from '@/lib/phone'
+import { formatContact } from '@/lib/phone'
 import { toast } from 'sonner'
+
+// How close (px) to the end of a scrolled list counts as "reached it" and
+// triggers loading the next page.
+const LOAD_MORE_THRESHOLD_PX = 120
 
 function formatTime(iso: string) {
   const d = new Date(iso)
@@ -46,11 +56,11 @@ function ConversationItem({
       )}
     >
       <div className="flex items-start gap-3">
-        <Avatar name={conv.worker_name ?? formatContact(conv.phone)} size="sm" />
+        <Avatar name={displayName} size="sm" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="font-semibold text-sm truncate">{displayName}</span>
-            <span className="text-xs text-muted-foreground shrink-0">{formatTime(conv.last_at)}</span>
+            <span className="text-xs text-muted-foreground shrink-0">{formatTime(conv.last_message_at)}</span>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">{formatContact(conv.phone)}</p>
           <div className="flex items-center gap-1.5 mt-1">
@@ -67,16 +77,58 @@ function ConversationItem({
   )
 }
 
+// Stable empty list, so a not-yet-loaded thread doesn't look like a change.
+const NO_MESSAGES: Message[] = []
+
+/** One open chat's loaded messages. `next` is the cursor for older ones. */
+interface Thread {
+  messages: Message[]
+  next: Cursor | null
+  loading: boolean
+}
+
 function MessageThread({
-  conv, onBack, onOptimisticSend, onOptimisticFail,
-}: { conv: Conversation; onBack: () => void; onOptimisticSend: (text: string) => string; onOptimisticFail: (id: string) => void }) {
+  conv, thread, onBack, onLoadOlder, onOptimisticSend, onOptimisticFail,
+}: {
+  conv: Conversation
+  thread: Thread | undefined
+  onBack: () => void
+  onLoadOlder: () => void
+  onOptimisticSend: (text: string) => string
+  onOptimisticFail: (id: string) => void
+}) {
   const [replyText, setReplyText] = useState('')
   const [isPending, startTransition] = useTransition()
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const messages = thread?.messages ?? NO_MESSAGES
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [conv.messages.length])
+  // Keep the view anchored as the message list changes: jump to the bottom on
+  // first load and when a new message arrives, but when older messages are
+  // prepended, offset by their height so what's on screen doesn't move.
+  const prevFirstId = useRef<string | null>(null)
+  const prevLastId = useRef<string | null>(null)
+  const prevHeight = useRef(0)
+  useLayoutEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const firstId = messages[0]?.id ?? null
+    const lastId = messages.at(-1)?.id ?? null
+    if (lastId !== prevLastId.current) {
+      el.scrollTop = el.scrollHeight
+    } else if (firstId !== prevFirstId.current) {
+      el.scrollTop += el.scrollHeight - prevHeight.current
+    }
+    prevFirstId.current = firstId
+    prevLastId.current = lastId
+    prevHeight.current = el.scrollHeight
+  }, [messages])
+
+  function handleScroll() {
+    const el = scrollRef.current
+    if (el && el.scrollTop < LOAD_MORE_THRESHOLD_PX && thread?.next && !thread.loading) {
+      onLoadOlder()
+    }
+  }
 
   function handleSend() {
     const text = replyText.trim()
@@ -84,7 +136,7 @@ function MessageThread({
     setReplyText('')
     const optimisticId = onOptimisticSend(text)
     startTransition(async () => {
-      const result = await sendReply(conv.phone, text)
+      const result = await sendReply(conv.id, text)
       if (result.error) {
         onOptimisticFail(optimisticId)
         toast.error(result.error)
@@ -124,8 +176,14 @@ function MessageThread({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-        {conv.messages.map((msg) => {
+      <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
+        {thread?.loading && (
+          <p className="text-center text-xs text-muted-foreground">Loading…</p>
+        )}
+        {thread && !thread.next && !thread.loading && messages.length > 0 && (
+          <p className="text-center text-xs text-muted-foreground">Start of conversation</p>
+        )}
+        {messages.map((msg) => {
           const isOptimistic = msg.id.startsWith('optimistic-')
           const isFailed = msg.id.startsWith('failed-')
           return (
@@ -164,7 +222,6 @@ function MessageThread({
             </div>
           )
         })}
-        <div ref={bottomRef} />
       </div>
 
       {/* Reply input */}
@@ -211,102 +268,175 @@ function uniqueChannelSuffix(): string {
   )
 }
 
-export function InboxView({ initialConversations }: { initialConversations: Conversation[] }) {
-  const [conversations, setConversations] = useState(initialConversations)
+/** Moves `conv` to the top of the list, replacing any older copy of it. */
+function bringToTop(list: Conversation[], conv: Conversation): Conversation[] {
+  return [conv, ...list.filter((c) => c.id !== conv.id)]
+}
+
+export function InboxView({
+  initialPage,
+  initialTotal,
+}: {
+  initialPage: Page<Conversation>
+  initialTotal: number
+}) {
+  const [conversations, setConversations] = useState(initialPage.items)
+  const [nextPage, setNextPage] = useState(initialPage.next)
+  const [loadingPage, setLoadingPage] = useState(false)
+  const [total, setTotal] = useState(initialTotal)
   const [selected, setSelected] = useState<string | null>(null)
+  const [threads, setThreads] = useState<Record<string, Thread>>({})
 
-  const selectedConv = conversations.find((c) => c.phone === selected) ?? null
+  // The realtime handler needs the current list to decide whether a message
+  // belongs to a conversation already shown; it can't read state directly.
+  const conversationsRef = useRef(conversations)
+  useEffect(() => {
+    conversationsRef.current = conversations
+  }, [conversations])
 
-  const refetch = useCallback(async () => {
-    const fresh = await getConversations()
-    setConversations(fresh)
+  const selectedConv = conversations.find((c) => c.id === selected) ?? null
+
+  const loadThread = useCallback(async (id: string, cursor?: Cursor) => {
+    setThreads((prev) => ({
+      ...prev,
+      [id]: { messages: prev[id]?.messages ?? [], next: prev[id]?.next ?? null, loading: true },
+    }))
+    try {
+      const page = await getMessages(id, cursor)
+      setThreads((prev) => {
+        const loaded = prev[id]?.messages ?? []
+        const known = new Set(loaded.map((m) => m.id))
+        const older = page.items.filter((m) => !known.has(m.id))
+        return { ...prev, [id]: { messages: [...older, ...loaded], next: page.next, loading: false } }
+      })
+    } catch {
+      toast.error('Could not load messages')
+      setThreads((prev) => ({ ...prev, [id]: { ...prev[id], loading: false } }))
+    }
   }, [])
+
+  function selectConversation(id: string) {
+    setSelected(id)
+    if (!threads[id]) loadThread(id)
+  }
+
+  async function loadMoreConversations() {
+    if (!nextPage || loadingPage) return
+    setLoadingPage(true)
+    try {
+      const page = await getConversations(nextPage)
+      setConversations((prev) => {
+        const known = new Set(prev.map((c) => c.id))
+        return [...prev, ...page.items.filter((c) => !known.has(c.id))]
+      })
+      setNextPage(page.next)
+    } catch {
+      toast.error('Could not load more conversations')
+    } finally {
+      setLoadingPage(false)
+    }
+  }
+
+  function handleListScroll(e: React.UIEvent<HTMLDivElement>) {
+    const el = e.currentTarget
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < LOAD_MORE_THRESHOLD_PX) {
+      loadMoreConversations()
+    }
+  }
 
   function handleOptimisticSend(text: string): string {
     const id = `optimistic-${Date.now()}`
     if (!selected) return id
-    setConversations((prev) => prev.map((c) => {
-      if (c.phone !== selected) return c
-      const optimistic: Message = {
-        id,
-        ...parseConversationKey(c.phone),
-        worker_id: c.worker_id,
-        direction: 'outbound',
-        body: text,
-        created_at: new Date().toISOString(),
-        is_availability_message: false,
-      }
-      return { ...c, messages: [...c.messages, optimistic], last_message: text, last_at: optimistic.created_at }
-    }))
+    const optimistic: Message = {
+      id,
+      conversation_id: selected,
+      direction: 'outbound',
+      body: text,
+      created_at: new Date().toISOString(),
+      is_availability_message: false,
+    }
+    setThreads((prev) => {
+      const t = prev[selected]
+      if (!t) return prev
+      return { ...prev, [selected]: { ...t, messages: [...t.messages, optimistic] } }
+    })
+    setConversations((prev) => {
+      const conv = prev.find((c) => c.id === selected)
+      return conv
+        ? bringToTop(prev, { ...conv, last_message: text, last_message_at: optimistic.created_at })
+        : prev
+    })
     return id
   }
 
   function handleOptimisticFail(id: string) {
-    setConversations((prev) => prev.map((c) => ({
-      ...c,
-      messages: c.messages.map((m) =>
-        m.id === id ? { ...m, id: `failed-${Date.now()}` } : m
-      ),
-    })))
+    setThreads((prev) => {
+      const out: Record<string, Thread> = {}
+      for (const [k, t] of Object.entries(prev)) {
+        out[k] = {
+          ...t,
+          messages: t.messages.map((m) => (m.id === id ? { ...m, id: `failed-${Date.now()}` } : m)),
+        }
+      }
+      return out
+    })
   }
 
-  // Realtime — listen for new rows in `messages`. Channel setup is synchronous
-  // so the cleanup always captures the reference, and the channel name uses a
-  // UUID to stay unique under React Strict Mode's double-invocation in dev.
+  // Realtime — listen for new rows in `messages`. The database trigger has
+  // already attached each row to its conversation, so `conversation_id` is set.
   useEffect(() => {
     const supabase = createClient()
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
     const channel = supabase
       .channel(`inbox-messages-${uniqueChannelSuffix()}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
-        (payload) => {
-          const row = payload.new as {
-            id: string
-            phone: string | null
-            bsuid: string | null
-            worker_id: string | null
-            direction: 'inbound' | 'outbound'
-            body: string | null
-            is_availability_message: boolean
-            created_at: string
+        async (payload) => {
+          const row = payload.new as Message & { worker_id: string | null }
+          const msg: Message = {
+            id: row.id,
+            conversation_id: row.conversation_id,
+            direction: row.direction,
+            body: row.body,
+            is_availability_message: row.is_availability_message,
+            created_at: row.created_at,
           }
 
-          const key = conversationKey(row.phone, row.bsuid)
+          // If that chat is loaded, append — replacing our own optimistic copy.
+          setThreads((prev) => {
+            const t = prev[msg.conversation_id]
+            if (!t || t.messages.some((m) => m.id === msg.id)) return prev
+            const withoutEcho = t.messages.filter(
+              (m) => !(m.id.startsWith('optimistic-') && m.body === msg.body && m.direction === msg.direction)
+            )
+            return { ...prev, [msg.conversation_id]: { ...t, messages: [...withoutEcho, msg] } }
+          })
+
+          const existing = conversationsRef.current.find((c) => c.id === msg.conversation_id)
+          // Unknown conversation (a new contact, or one beyond the loaded
+          // pages), or a worker who just registered: fetch the row so the name
+          // and preview are right.
+          if (!existing || (row.worker_id && !existing.worker_name)) {
+            const [conv, count] = await Promise.all([
+              getConversation(msg.conversation_id),
+              getConversationCount(),
+            ])
+            if (conv) setConversations((prev) => bringToTop(prev, conv))
+            setTotal(count)
+            return
+          }
+
           setConversations((prev) => {
-            const existing = prev.find((c) => c.phone === key)
-
-            const newMsg: Message = {
-              id: row.id,
-              phone: row.phone,
-              bsuid: row.bsuid,
-              worker_id: row.worker_id,
-              direction: row.direction,
-              body: row.body,
-              is_availability_message: row.is_availability_message,
-              created_at: row.created_at,
-            }
-
-            if (existing) {
-              const filtered = existing.messages.filter(
-                (m) => !(m.id.startsWith('optimistic-') && m.body === row.body && m.direction === row.direction)
-              )
-              const updated: Conversation = {
-                ...existing,
-                messages: [...filtered, newMsg],
-                last_message: row.body,
-                last_at: row.created_at,
-                unread: existing.unread || (row.direction === 'inbound' && row.created_at > cutoff),
-              }
-              const rest = prev.filter((c) => c.phone !== key)
-              return [updated, ...rest]
-            }
-
-            // New phone number — fall back to refetch to get worker name
-            refetch()
-            return prev
+            const conv = prev.find((c) => c.id === msg.conversation_id)
+            if (!conv) return prev
+            return bringToTop(prev, {
+              ...conv,
+              last_message: msg.body,
+              last_message_at: msg.created_at,
+              last_inbound_at: msg.direction === 'inbound' ? msg.created_at : conv.last_inbound_at,
+              unread: conv.unread || msg.direction === 'inbound',
+            })
           })
         }
       )
@@ -315,9 +445,9 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [refetch])
+  }, [])
 
-  if (conversations.length === 0) {
+  if (total === 0 && conversations.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full py-20 text-center p-4">
         <MessageSquare className="h-10 w-10 text-muted-foreground mb-4" />
@@ -332,22 +462,28 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
   return (
     <div className="flex h-[calc(100dvh-4rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] md:h-dvh overflow-hidden">
       {/* Conversation list */}
-      <div className={cn(
-        'w-full md:w-80 md:border-r md:border-border flex-col overflow-y-auto shrink-0',
-        selected ? 'hidden md:flex' : 'flex'
-      )}>
+      <div
+        onScroll={handleListScroll}
+        className={cn(
+          'w-full md:w-80 md:border-r md:border-border flex-col overflow-y-auto shrink-0',
+          selected ? 'hidden md:flex' : 'flex'
+        )}
+      >
         <div className="px-4 py-4 border-b border-border">
           <h1 className="text-xl font-semibold">Inbox</h1>
-          <p className="text-xs text-muted-foreground mt-0.5">{conversations.length} conversation{conversations.length !== 1 ? 's' : ''}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{total} conversation{total !== 1 ? 's' : ''}</p>
         </div>
         {conversations.map((conv) => (
           <ConversationItem
-            key={conv.phone}
+            key={conv.id}
             conv={conv}
-            active={conv.phone === selected}
-            onClick={() => setSelected(conv.phone)}
+            active={conv.id === selected}
+            onClick={() => selectConversation(conv.id)}
           />
         ))}
+        {loadingPage && (
+          <p className="py-4 text-center text-xs text-muted-foreground">Loading…</p>
+        )}
       </div>
 
       {/* Thread view */}
@@ -356,7 +492,18 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
         selected ? 'flex' : 'hidden md:flex'
       )}>
         {selectedConv ? (
-          <MessageThread conv={selectedConv} onBack={() => setSelected(null)} onOptimisticSend={handleOptimisticSend} onOptimisticFail={handleOptimisticFail} />
+          <MessageThread
+            key={selectedConv.id}
+            conv={selectedConv}
+            thread={threads[selectedConv.id]}
+            onBack={() => setSelected(null)}
+            onLoadOlder={() => {
+              const t = threads[selectedConv.id]
+              if (t?.next) loadThread(selectedConv.id, t.next)
+            }}
+            onOptimisticSend={handleOptimisticSend}
+            onOptimisticFail={handleOptimisticFail}
+          />
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
             Select a conversation

@@ -75,6 +75,24 @@ create table public.job_broadcasts (
 );
 
 -- ---------------------------------------------------------------
+-- CONVERSATIONS
+-- One row per contact, maintained by the messages_attach_conversation
+-- trigger (see migration 20261016000001_conversations.sql). Stores the
+-- inbox summary so the list and each chat are read a page at a time.
+-- ---------------------------------------------------------------
+create table public.conversations (
+  id               uuid        primary key default gen_random_uuid(),
+  phone            text,
+  bsuid            text,
+  worker_id        uuid        references public.workers(id) on delete set null,
+  last_message     text,
+  last_message_at  timestamptz not null,
+  last_inbound_at  timestamptz,
+  created_at       timestamptz not null default now(),
+  constraint conversations_contact_present check (phone is not null or bsuid is not null)
+);
+
+-- ---------------------------------------------------------------
 -- MESSAGES
 -- WhatsApp message log (inbound and outbound).
 -- ---------------------------------------------------------------
@@ -83,6 +101,7 @@ create table public.messages (
   worker_id               uuid        references public.workers(id) on delete set null,
   phone                   text,       -- null for username-only senders
   bsuid                   text,       -- WhatsApp business-scoped user ID
+  conversation_id         uuid        not null references public.conversations(id) on delete cascade,
   direction               text        not null check (direction in ('inbound', 'outbound')),
   body                    text,
   is_availability_message boolean     not null default false,

@@ -24,6 +24,8 @@ export interface Worker {
   available_days: DayOfWeek[] | null
   status: WorkerStatus
   notes: string | null
+  /** WhatsApp business-scoped user ID, when known. */
+  bsuid: string | null
   created_at: string
   updated_at: string
 }
@@ -75,7 +77,9 @@ export interface JobBroadcast {
 export interface Message {
   id: string
   worker_id: string | null
-  phone: string
+  /** Null when the sender has a WhatsApp username and Meta withheld their number. */
+  phone: string | null
+  bsuid: string | null
   direction: MessageDirection
   body: string | null
   is_availability_message: boolean

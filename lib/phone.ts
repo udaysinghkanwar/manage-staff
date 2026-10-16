@@ -28,3 +28,25 @@ export function normalizePhone(input: string): string {
   if (digits.length === 11 && digits.startsWith('1')) return digits
   return digits
 }
+
+// ─── Conversation keys ──────────────────────────────────────────────────────
+// The inbox groups messages by sender. Senders with a WhatsApp username may
+// have no phone number on record, only a business-scoped user ID (BSUID), so
+// those conversations are keyed by a prefixed BSUID instead.
+
+const BSUID_PREFIX = 'bsuid:'
+
+export function conversationKey(phone: string | null, bsuid: string | null): string {
+  return phone ?? `${BSUID_PREFIX}${bsuid ?? ''}`
+}
+
+export function parseConversationKey(key: string): { phone: string | null; bsuid: string | null } {
+  return key.startsWith(BSUID_PREFIX)
+    ? { phone: null, bsuid: key.slice(BSUID_PREFIX.length) }
+    : { phone: key, bsuid: null }
+}
+
+/** Display form of a conversation key: the formatted number, or a placeholder. */
+export function formatContact(key: string): string {
+  return key.startsWith(BSUID_PREFIX) ? 'WhatsApp user (number hidden)' : formatPhone(key)
+}

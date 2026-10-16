@@ -2,10 +2,12 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { sendWhatsAppMessage } from '@/lib/whatsapp/send'
+import { conversationKey, parseConversationKey } from '@/lib/phone'
 
 export interface Message {
   id: string
-  phone: string
+  phone: string | null
+  bsuid: string | null
   worker_id: string | null
   direction: 'inbound' | 'outbound'
   body: string | null
@@ -14,6 +16,7 @@ export interface Message {
 }
 
 export interface Conversation {
+  /** Conversation key from conversationKey(): the phone number, or a prefixed BSUID. */
   phone: string
   worker_id: string | null
   worker_name: string | null
@@ -28,7 +31,7 @@ export async function getConversations(): Promise<Conversation[]> {
 
   const { data, error } = await supabase
     .from('messages')
-    .select('id, phone, worker_id, direction, body, is_availability_message, created_at, workers(id, name)')
+    .select('id, phone, bsuid, worker_id, direction, body, is_availability_message, created_at, workers(id, name)')
     .order('created_at', { ascending: true })
 
   if (error) throw new Error(error.message)
@@ -41,6 +44,7 @@ export async function getConversations(): Promise<Conversation[]> {
     const msg: Message = {
       id: row.id,
       phone: row.phone,
+      bsuid: row.bsuid,
       worker_id: row.worker_id,
       direction: row.direction as 'inbound' | 'outbound',
       body: row.body,
@@ -48,9 +52,10 @@ export async function getConversations(): Promise<Conversation[]> {
       created_at: row.created_at,
     }
 
-    if (!byPhone.has(row.phone)) {
-      byPhone.set(row.phone, {
-        phone: row.phone,
+    const key = conversationKey(row.phone, row.bsuid)
+    if (!byPhone.has(key)) {
+      byPhone.set(key, {
+        phone: key,
         worker_id: row.worker_id,
         worker_name: (worker as { name?: string } | null)?.name ?? null,
         last_message: row.body,
@@ -60,7 +65,7 @@ export async function getConversations(): Promise<Conversation[]> {
       })
     }
 
-    const conv = byPhone.get(row.phone)!
+    const conv = byPhone.get(key)!
     conv.messages.push(msg)
     conv.last_message = row.body
     conv.last_at = row.created_at
@@ -78,8 +83,9 @@ export async function getConversations(): Promise<Conversation[]> {
   )
 }
 
-export async function sendReply(phone: string, body: string): Promise<{ error: string | null }> {
-  const result = await sendWhatsAppMessage({ to: phone, type: 'text', text: body })
+export async function sendReply(key: string, body: string): Promise<{ error: string | null }> {
+  const { phone, bsuid } = parseConversationKey(key)
+  const result = await sendWhatsAppMessage({ to: phone, recipient: bsuid, type: 'text', text: body })
   if (!result.success) return { error: 'Failed to send message' }
   return { error: null }
 }

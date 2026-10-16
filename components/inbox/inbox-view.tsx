@@ -8,7 +8,7 @@ import type { Conversation, Message } from '@/lib/inbox'
 import { Button } from '@/components/ui/button'
 import { MessageSquare, ChevronLeft, Send, ExternalLink, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { formatPhone } from '@/lib/phone'
+import { conversationKey, formatContact, parseConversationKey } from '@/lib/phone'
 import { toast } from 'sonner'
 
 function formatTime(iso: string) {
@@ -36,7 +36,7 @@ function Avatar({ name, size = 'md' }: { name: string; size?: 'sm' | 'md' }) {
 function ConversationItem({
   conv, active, onClick,
 }: { conv: Conversation; active: boolean; onClick: () => void }) {
-  const displayName = conv.worker_name ?? formatPhone(conv.phone)
+  const displayName = conv.worker_name ?? formatContact(conv.phone)
   return (
     <button
       onClick={onClick}
@@ -46,13 +46,13 @@ function ConversationItem({
       )}
     >
       <div className="flex items-start gap-3">
-        <Avatar name={conv.worker_name ?? conv.phone} size="sm" />
+        <Avatar name={conv.worker_name ?? formatContact(conv.phone)} size="sm" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center justify-between gap-2">
             <span className="font-semibold text-sm truncate">{displayName}</span>
             <span className="text-xs text-muted-foreground shrink-0">{formatTime(conv.last_at)}</span>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">{formatPhone(conv.phone)}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{formatContact(conv.phone)}</p>
           <div className="flex items-center gap-1.5 mt-1">
             {conv.unread && (
               <span className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
@@ -92,7 +92,7 @@ function MessageThread({
     })
   }
 
-  const displayName = conv.worker_name ?? formatPhone(conv.phone)
+  const displayName = conv.worker_name ?? formatContact(conv.phone)
 
   return (
     <div className="flex flex-col h-full">
@@ -114,7 +114,7 @@ function MessageThread({
               </Link>
             )}
           </div>
-          <p className="text-xs text-muted-foreground">{formatPhone(conv.phone)}</p>
+          <p className="text-xs text-muted-foreground">{formatContact(conv.phone)}</p>
         </div>
         {conv.worker_id && (
           <span className="shrink-0 text-xs font-medium px-2.5 py-0.5 rounded-full border border-emerald-600/60 text-emerald-400">
@@ -229,7 +229,7 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
       if (c.phone !== selected) return c
       const optimistic: Message = {
         id,
-        phone: c.phone,
+        ...parseConversationKey(c.phone),
         worker_id: c.worker_id,
         direction: 'outbound',
         body: text,
@@ -265,7 +265,8 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
         (payload) => {
           const row = payload.new as {
             id: string
-            phone: string
+            phone: string | null
+            bsuid: string | null
             worker_id: string | null
             direction: 'inbound' | 'outbound'
             body: string | null
@@ -273,12 +274,14 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
             created_at: string
           }
 
+          const key = conversationKey(row.phone, row.bsuid)
           setConversations((prev) => {
-            const existing = prev.find((c) => c.phone === row.phone)
+            const existing = prev.find((c) => c.phone === key)
 
             const newMsg: Message = {
               id: row.id,
               phone: row.phone,
+              bsuid: row.bsuid,
               worker_id: row.worker_id,
               direction: row.direction,
               body: row.body,
@@ -297,7 +300,7 @@ export function InboxView({ initialConversations }: { initialConversations: Conv
                 last_at: row.created_at,
                 unread: existing.unread || (row.direction === 'inbound' && row.created_at > cutoff),
               }
-              const rest = prev.filter((c) => c.phone !== row.phone)
+              const rest = prev.filter((c) => c.phone !== key)
               return [updated, ...rest]
             }
 

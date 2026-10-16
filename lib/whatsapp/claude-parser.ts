@@ -3,6 +3,8 @@ import type { DayOfWeek, ShiftType, AvailabilityType, WorkerGender } from '@/lib
 
 export interface ParsedWorkerData {
   name: string | null
+  /** Digits only, with country code (e.g. "14165550002"); null if absent or unusable. */
+  phone: string | null
   city: string | null
   main_intersection: string | null
   age: number | null
@@ -15,6 +17,7 @@ export interface ParsedWorkerData {
 
 const EMPTY: ParsedWorkerData = {
   name: null,
+  phone: null,
   city: null,
   main_intersection: null,
   age: null,
@@ -29,6 +32,7 @@ const SYSTEM_PROMPT = `You are a parser for a staffing agency in Ontario, Canada
 Return ONLY a JSON object with these fields (use null for anything not mentioned):
 {
   "name": string | null,
+  "phone": string | null,
   "city": string | null,
   "main_intersection": string | null,
   "age": integer | null,
@@ -56,6 +60,10 @@ main_intersection rules:
 age rules:
 - Return an integer between 18 and 119, or null if not mentioned or out of range.
 
+phone rules:
+- The sender's own phone number, exactly as written (e.g. "(416) 555-0002", "+1 647 555 0002").
+- Return null if no phone number is in the message. Never invent one.
+
 shifts rules:
 - Return an array of shifts the worker is available for. Workers can list multiple (e.g. "day and afternoon" → ["day", "afternoon"]).
 - Allowed values: "day", "afternoon", "night". Use lowercase exactly as listed.
@@ -66,6 +74,16 @@ available_days rules:
 - Values must be from: mon, tue, wed, thu, fri, sat, sun.
 
 Do not include any explanation. Return only the JSON object.`
+
+// Store numbers the way Meta reports them: digits only, with country code.
+// A bare 10-digit number is North American, so it gets the leading 1.
+function normalizePhone(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null
+  const digits = raw.replace(/\D/g, '')
+  if (digits.length === 10) return `1${digits}`
+  if (digits.length >= 11 && digits.length <= 15) return digits
+  return null
+}
 
 const client = new Anthropic()
 
@@ -99,6 +117,7 @@ export async function parseAvailabilityMessage(
 
     const result: ParsedWorkerData = {
       name: parsed.name ?? null,
+      phone: normalizePhone(parsed.phone),
       city: typeof parsed.city === 'string' ? parsed.city.trim() || null : null,
       main_intersection:
         typeof parsed.main_intersection === 'string'

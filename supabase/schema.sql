@@ -27,6 +27,7 @@ create table public.workers (
   status            text        not null default 'active'
                                 check (status in ('active', 'inactive')),
   notes             text,
+  bsuid             text        unique, -- WhatsApp business-scoped user ID
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now()
 );
@@ -80,11 +81,13 @@ create table public.job_broadcasts (
 create table public.messages (
   id                      uuid        primary key default gen_random_uuid(),
   worker_id               uuid        references public.workers(id) on delete set null,
-  phone                   text        not null,
+  phone                   text,       -- null for username-only senders
+  bsuid                   text,       -- WhatsApp business-scoped user ID
   direction               text        not null check (direction in ('inbound', 'outbound')),
   body                    text,
   is_availability_message boolean     not null default false,
-  created_at              timestamptz not null default now()
+  created_at              timestamptz not null default now(),
+  constraint messages_sender_present check (phone is not null or bsuid is not null)
 );
 
 -- ---------------------------------------------------------------
